@@ -130,7 +130,7 @@ export default function Login() {
         </div>
 
         <p className="text-center text-xs text-text-secondary mt-6">
-          Sistema de gestão para clínicas
+          Tem Horário · Agenda e CRM para clínicas
         </p>
       </div>
     </div>
