@@ -2,6 +2,64 @@
 @tailwind components;
 @tailwind utilities;
 
+:root {
+  --color-accent: 184 92 114;
+  --color-accent-light: 247 237 240;
+  --color-accent-medium: 212 132 154;
+  --color-accent-dark: 143 63 85;
+
+  --color-success: 26 122 72;
+  --color-success-light: 232 248 239;
+
+  --color-status-info: 41 128 185;
+  --color-status-info-light: 235 244 253;
+  --color-status-warning: 183 119 13;
+  --color-status-warning-light: 254 249 236;
+  --color-status-danger: 192 57 43;
+  --color-status-danger-light: 253 236 234;
+  --color-status-purple: 108 52 131;
+  --color-status-purple-light: 240 235 248;
+  --color-status-teal: 14 124 134;
+  --color-status-teal-light: 230 246 248;
+
+  --color-page: 244 242 239;
+  --color-card: 255 255 255;
+  --color-border: 235 235 235;
+  --color-border-subtle: 245 245 245;
+  --color-surface-hover: 250 250 250;
+  --color-text-primary: 26 26 26;
+  --color-text-secondary: 122 122 122;
+}
+
+:root.dark {
+  --color-accent: 209 118 144;
+  --color-accent-light: 58 37 48;
+  --color-accent-medium: 222 138 160;
+  --color-accent-dark: 166 87 112;
+
+  --color-success: 63 167 107;
+  --color-success-light: 28 51 36;
+
+  --color-status-info: 95 168 222;
+  --color-status-info-light: 27 46 61;
+  --color-status-warning: 224 165 66;
+  --color-status-warning-light: 58 46 18;
+  --color-status-danger: 224 107 93;
+  --color-status-danger-light: 61 31 27;
+  --color-status-purple: 176 127 196;
+  --color-status-purple-light: 46 31 56;
+  --color-status-teal: 79 179 189;
+  --color-status-teal-light: 22 51 56;
+
+  --color-page: 28 26 30;
+  --color-card: 36 34 38;
+  --color-border: 56 53 59;
+  --color-border-subtle: 42 40 45;
+  --color-surface-hover: 44 42 48;
+  --color-text-primary: 242 240 238;
+  --color-text-secondary: 163 159 166;
+}
+
 @layer base {
   * {
     box-sizing: border-box;
@@ -15,9 +73,10 @@
   }
 
   body {
-    background-color: #F4F2EF;
-    color: #1A1A1A;
+    background-color: rgb(var(--color-page));
+    color: rgb(var(--color-text-primary));
     -webkit-font-smoothing: antialiased;
+    transition: background-color 0.2s ease, color 0.2s ease;
   }
 }
 
@@ -67,5 +126,5 @@
 /* Custom scrollbar */
 ::-webkit-scrollbar { width: 5px; height: 5px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #D4849A; border-radius: 99px; }
-::-webkit-scrollbar-thumb:hover { background: #B85C72; }
+::-webkit-scrollbar-thumb { background: rgb(var(--color-accent-medium)); border-radius: 99px; }
+::-webkit-scrollbar-thumb:hover { background: rgb(var(--color-accent)); }

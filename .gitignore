@@ -11,6 +11,7 @@ dist/
 
 # Sensitive scripts
 setup_db.sh
+migrations/*.sh
 
 # Editor directories and files
 .vscode/

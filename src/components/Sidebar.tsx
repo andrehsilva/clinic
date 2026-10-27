@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { NavLink, useNavigate } from 'react-router-dom'
 import {
   LayoutDashboard,
@@ -8,22 +8,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Stethoscope,
+  Sun,
+  Moon,
+  LogOut,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
+import { useAuth } from '../contexts/AuthContext'
+import { useTheme } from '../contexts/ThemeContext'
 
 interface SidebarProps {
   collapsed: boolean
   setCollapsed: (v: boolean) => void
-}
-
-interface UserProfile {
-  nome: string
-  avatar_url: string | null
-}
-
-interface ClinicConfig {
-  logo_url: string | null
-  nome_clinica: string | null
 }
 
 const navItems = [
@@ -35,40 +30,19 @@ const navItems = [
 
 export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
   const navigate = useNavigate()
-  const [profile, setProfile] = useState<UserProfile | null>(null)
-  const [clinic, setClinic] = useState<ClinicConfig | null>(null)
-
-  const loadClinic = async () => {
-    const { data: cfg } = await supabase
-      .from('configuracoes_clinica')
-      .select('logo_url, nome_clinica')
-      .limit(1)
-      .maybeSingle()
-    if (cfg) setClinic(cfg)
-  }
-
-  const loadProfile = async () => {
-    const { data: { user } } = await supabase.auth.getUser()
-    if (!user) return
-    const { data: usr } = await supabase
-      .from('usuarios')
-      .select('nome, avatar_url')
-      .eq('id', user.id)
-      .single()
-    if (usr) setProfile(usr)
-  }
+  const { profile, clinic } = useAuth()
+  const { theme, toggleTheme } = useTheme()
+  const [menuOpen, setMenuOpen] = useState(false)
+  const menuRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    loadProfile()
-    loadClinic()
-    window.addEventListener('clinic-logo-updated', loadClinic)
-    window.addEventListener('user-profile-updated', loadProfile)
-    return () => {
-      window.removeEventListener('clinic-logo-updated', loadClinic)
-      window.removeEventListener('user-profile-updated', loadProfile)
+    if (!menuOpen) return
+    const handleClickOutside = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false)
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [])
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [menuOpen])
 
   const handleLogout = async () => {
     await supabase.auth.signOut()
@@ -81,13 +55,13 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
 
   return (
     <aside
-      className="sidebar-transition flex flex-col bg-white border-r border-border flex-shrink-0 h-full relative"
+      className="sidebar-transition flex flex-col bg-card border-r border-border flex-shrink-0 h-full relative"
       style={{ width: collapsed ? 64 : 220 }}
     >
       {/* Toggle button */}
       <button
         onClick={() => setCollapsed(!collapsed)}
-        className="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full bg-white border border-border flex items-center justify-center shadow-card hover:shadow-card-hover transition-shadow"
+        className="absolute -right-3 top-6 z-10 w-6 h-6 rounded-full bg-card border border-border flex items-center justify-center shadow-card hover:shadow-card-hover transition-shadow"
       >
         {collapsed
           ? <ChevronRight size={12} className="text-text-secondary" />
@@ -121,7 +95,7 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
               `flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all duration-150 overflow-hidden whitespace-nowrap
               ${isActive
                 ? 'bg-accent-light text-accent'
-                : 'text-text-secondary hover:bg-gray-50 hover:text-text-primary'
+                : 'text-text-secondary hover:bg-surface-hover hover:text-text-primary'
               }`
             }
           >
@@ -139,11 +113,30 @@ export default function Sidebar({ collapsed, setCollapsed }: SidebarProps) {
       </nav>
 
       {/* Footer / User */}
-      <div className="border-t border-border p-3">
+      <div ref={menuRef} className="relative border-t border-border p-3">
+        {menuOpen && (
+          <div className="absolute bottom-full left-3 mb-2 w-52 bg-card border border-border rounded-xl shadow-card-hover overflow-hidden fade-in z-20">
+            <button
+              onClick={() => toggleTheme()}
+              className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors"
+            >
+              {theme === 'dark' ? <Sun size={15} className="flex-shrink-0" /> : <Moon size={15} className="flex-shrink-0" />}
+              {theme === 'dark' ? 'Tema claro' : 'Tema escuro'}
+            </button>
+            <button
+              onClick={() => { setMenuOpen(false); handleLogout() }}
+              className="flex items-center gap-2.5 w-full px-3 py-2.5 text-sm text-status-danger hover:bg-status-danger-light transition-colors border-t border-border"
+            >
+              <LogOut size={15} className="flex-shrink-0" />
+              Sair
+            </button>
+          </div>
+        )}
+
         <button
-          onClick={handleLogout}
-          title="Sair"
-          className="flex items-center gap-2.5 w-full rounded-xl p-2 hover:bg-gray-50 transition-colors overflow-hidden"
+          onClick={() => setMenuOpen(o => !o)}
+          title="Configurações da conta"
+          className="flex items-center gap-2.5 w-full rounded-xl p-2 hover:bg-surface-hover transition-colors overflow-hidden"
         >
           <div className="w-8 h-8 rounded-full bg-accent flex items-center justify-center flex-shrink-0 text-white text-xs font-bold">
             {profile?.avatar_url

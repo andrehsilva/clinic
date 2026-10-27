@@ -1,6 +1,7 @@
 /** @type {import('tailwindcss').Config} */
 export default {
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
+  darkMode: 'class',
   theme: {
     extend: {
       fontFamily: {
@@ -8,21 +9,49 @@ export default {
       },
       colors: {
         accent: {
-          DEFAULT: '#B85C72',
-          light: '#F7EDF0',
-          medium: '#D4849A',
-          dark: '#8F3F55',
+          DEFAULT: 'rgb(var(--color-accent) / <alpha-value>)',
+          light: 'rgb(var(--color-accent-light) / <alpha-value>)',
+          medium: 'rgb(var(--color-accent-medium) / <alpha-value>)',
+          dark: 'rgb(var(--color-accent-dark) / <alpha-value>)',
         },
         success: {
-          DEFAULT: '#1A7A48',
-          light: '#E8F8EF',
+          DEFAULT: 'rgb(var(--color-success) / <alpha-value>)',
+          light: 'rgb(var(--color-success-light) / <alpha-value>)',
         },
-        page: '#F4F2EF',
-        card: '#FFFFFF',
-        border: '#EBEBEB',
+        status: {
+          info: {
+            DEFAULT: 'rgb(var(--color-status-info) / <alpha-value>)',
+            light: 'rgb(var(--color-status-info-light) / <alpha-value>)',
+          },
+          warning: {
+            DEFAULT: 'rgb(var(--color-status-warning) / <alpha-value>)',
+            light: 'rgb(var(--color-status-warning-light) / <alpha-value>)',
+          },
+          danger: {
+            DEFAULT: 'rgb(var(--color-status-danger) / <alpha-value>)',
+            light: 'rgb(var(--color-status-danger-light) / <alpha-value>)',
+          },
+          purple: {
+            DEFAULT: 'rgb(var(--color-status-purple) / <alpha-value>)',
+            light: 'rgb(var(--color-status-purple-light) / <alpha-value>)',
+          },
+          teal: {
+            DEFAULT: 'rgb(var(--color-status-teal) / <alpha-value>)',
+            light: 'rgb(var(--color-status-teal-light) / <alpha-value>)',
+          },
+        },
+        page: 'rgb(var(--color-page) / <alpha-value>)',
+        card: 'rgb(var(--color-card) / <alpha-value>)',
+        border: {
+          DEFAULT: 'rgb(var(--color-border) / <alpha-value>)',
+          subtle: 'rgb(var(--color-border-subtle) / <alpha-value>)',
+        },
+        surface: {
+          hover: 'rgb(var(--color-surface-hover) / <alpha-value>)',
+        },
         text: {
-          primary: '#1A1A1A',
-          secondary: '#7A7A7A',
+          primary: 'rgb(var(--color-text-primary) / <alpha-value>)',
+          secondary: 'rgb(var(--color-text-secondary) / <alpha-value>)',
         },
       },
       borderRadius: {
