@@ -573,8 +573,10 @@ export default function LeadDetail() {
   const qtdAgendadas = consultas.filter(c => c.status === 'agendada').length
   const qtdRealizadas = consultas.filter(c => c.status === 'realizada').length
   const abrirNovaConsulta = () => { setNovaConsultaInitial(undefined); setShowNovaConsulta(true) }
+  // Valor lançado em consulta agendada (sinal/adiantamento) também é dinheiro pago;
+  // canceladas e faltas ficam de fora.
   const totalPago = consultas
-    .filter(c => c.status === 'realizada')
+    .filter(c => c.status === 'realizada' || c.status === 'agendada')
     .reduce((soma, c) => soma + (c.valor_pago ?? 0), 0)
 
   return (
