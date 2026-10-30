@@ -129,7 +129,7 @@ export function FunilEditor({ clinicaId, nicho, onSaved }: {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border border-border rounded-xl p-4">
         <div>
           <p className="text-sm font-semibold text-text-primary">Simplificar colunas</p>
-          <p className="text-xs text-text-secondary mt-1">Junta Reagendado em Em conversa - Reagendamento e reduz outras colunas, sem mudar as chaves que os fluxos do WhatsApp usam.</p>
+          <p className="text-xs text-text-secondary mt-1">Agrupa Reagendado e Reengajamento em Orçamento em Negociação e reduz as colunas visíveis.</p>
         </div>
         <button type="button" onClick={() => setConfirmLayout(true)} disabled={saving}
           className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent-dark disabled:opacity-60">
@@ -138,7 +138,7 @@ export function FunilEditor({ clinicaId, nicho, onSaved }: {
       </div>
       {confirmLayout && (
         <div className="border border-border rounded-xl p-4 space-y-3">
-          <p className="text-sm text-text-primary">Reagendado passa a aparecer em Em conversa - Reagendamento. Retorno continua separado para o fluxo agendado; ao chegar a data, mantenha a automação que muda o status para conversando. O layout substitui as dobras atuais, mas mantém as chaves e regras.</p>
+          <p className="text-sm text-text-primary">Reagendado, Reengajamento e suas etapas relacionadas aparecem em Orçamento em Negociação. Retorno continua separado. Para o modo manual suspender mensagens, cada fluxo do n8n precisa ignorar leads com atendimento_manual = true.</p>
           <div className="flex justify-end gap-2">
             <button type="button" onClick={() => setConfirmLayout(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-text-secondary hover:text-text-primary">Cancelar</button>
             <button type="button" onClick={aplicarLayout} disabled={saving} className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent-dark disabled:opacity-60">Confirmar</button>

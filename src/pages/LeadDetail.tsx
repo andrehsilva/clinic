@@ -4,7 +4,7 @@ import {
   ArrowLeft, Phone, Clock, Stethoscope, FileText,
   CalendarDays, BanknoteIcon, NotebookPen, Save,
   PlusCircle, X, Inbox, Link as LinkIcon, ExternalLink,
-  Pencil, Trash2, Check, UserX, RotateCcw, Bot, UserRound,
+  Pencil, Trash2, Check, UserX, RotateCcw, Bot, UserRound, Repeat2,
 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
@@ -39,6 +39,7 @@ interface Lead {
   arquivado: boolean
   arquivado_em: string | null
   atendimento_manual: boolean
+  tag_paciente_recorrente: boolean
   em_tratamento: boolean
   status_atualizado_em: string | null
 }
@@ -266,6 +267,7 @@ export default function LeadDetail() {
   const [classificandoRetorno, setClassificandoRetorno] = useState(false)
   const [togglingArquivado, setTogglingArquivado] = useState(false)
   const [togglingAtendimentoManual, setTogglingAtendimentoManual] = useState(false)
+  const [togglingTagRecorrente, setTogglingTagRecorrente] = useState(false)
   const [togglingEmTratamento, setTogglingEmTratamento] = useState(false)
   // Só campos que não são derivados do histórico de consultas nem da classificação de retorno.
   const [ficha, setFicha] = useState({
@@ -354,20 +356,22 @@ export default function LeadDetail() {
     // Já está nesta etapa (inclusive quando a chave gravada é uma etapa dobrada).
     if (valor === exibida) return
 
-    if (exigeConsulta.has(valor) && !exigeConsulta.has(exibida)) {
-      const ok = await hasConsultaRealizada(id)
-      if (!ok) { setToastMsg(BLOQUEIO_SEM_CONSULTA_MSG); setStatusValue(exibida); return }
-    }
+    if (!lead.atendimento_manual) {
+      if (exigeConsulta.has(valor) && !exigeConsulta.has(lead.status)) {
+        const ok = await hasConsultaRealizada(id)
+        if (!ok) { setToastMsg(BLOQUEIO_SEM_CONSULTA_MSG); setStatusValue(exibida); return }
+      }
 
-    if (ETAPAS_AUTOMATICAS.has(valor)) {
-      setToastMsg(BLOQUEIO_ETAPA_AUTOMATICA_MSG)
-      setStatusValue(exibida)
-      return
-    }
+      if (ETAPAS_AUTOMATICAS.has(valor)) {
+        setToastMsg(BLOQUEIO_ETAPA_AUTOMATICA_MSG)
+        setStatusValue(exibida)
+        return
+      }
 
-    if (REQUIRES_CONSULTA_AGENDADA.has(valor) && !REQUIRES_CONSULTA_AGENDADA.has(exibida)) {
-      const ok = await hasConsultaAgendada(id)
-      if (!ok) { setToastMsg(BLOQUEIO_SEM_AGENDAMENTO_MSG); setStatusValue(exibida); return }
+      if (REQUIRES_CONSULTA_AGENDADA.has(valor) && !REQUIRES_CONSULTA_AGENDADA.has(lead.status)) {
+        const ok = await hasConsultaAgendada(id)
+        if (!ok) { setToastMsg(BLOQUEIO_SEM_AGENDAMENTO_MSG); setStatusValue(exibida); return }
+      }
     }
 
     setSavingStatus(true)
@@ -410,6 +414,20 @@ export default function LeadDetail() {
     setTogglingAtendimentoManual(false)
     if (error) { setToastMsg('Não foi possível atualizar. Tente novamente.'); return }
     setLead(prev => prev ? { ...prev, atendimento_manual: novo } : prev)
+  }
+
+  const toggleTagRecorrente = async () => {
+    if (!id || !lead) return
+    setTogglingTagRecorrente(true)
+    const tagPacienteRecorrente = !lead.tag_paciente_recorrente
+    const { data, error } = await supabase.from('leads_clinica')
+      .update({ tag_paciente_recorrente: tagPacienteRecorrente })
+      .eq('id', id).eq('clinica_id', clinicaId)
+      .select('tag_paciente_recorrente')
+      .single()
+    setTogglingTagRecorrente(false)
+    if (error) { setToastMsg('Não foi possível atualizar a tag. Verifique se a migration 028 foi aplicada.'); return }
+    setLead(prev => prev ? { ...prev, tag_paciente_recorrente: data.tag_paciente_recorrente } : prev)
   }
 
   // Ao desligar, a classificação de retorno volta na hora (classificacaoAtrasada
@@ -577,6 +595,12 @@ export default function LeadDetail() {
                 {lead.atendimento_manual ? <UserRound size={13} /> : <Bot size={13} />}
                 {lead.atendimento_manual ? 'Atendimento manual' : 'Assumir atendimento'}
               </button>
+              <button onClick={toggleTagRecorrente} disabled={togglingTagRecorrente}
+                aria-pressed={lead.tag_paciente_recorrente}
+                className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50 ${lead.tag_paciente_recorrente ? 'border-status-purple text-status-purple bg-status-purple-light' : 'border-border text-text-secondary hover:border-status-purple hover:text-status-purple'}`}>
+                <Repeat2 size={13} />
+                {lead.tag_paciente_recorrente ? 'Paciente Recorrente' : 'Marcar recorrente'}
+              </button>
               <button onClick={toggleArquivado} disabled={togglingArquivado}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50
                   ${lead.arquivado
@@ -602,6 +626,11 @@ export default function LeadDetail() {
                     {badgeColor.pulse && <span className={`w-1.5 h-1.5 rounded-full pulse-dot ${badgeColor.dot}`} />}
                     {badgeLabel}
                   </span>
+                  {lead.tag_paciente_recorrente && (
+                    <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-status-purple-light text-status-purple">
+                      <Repeat2 size={12} /> Paciente Recorrente
+                    </span>
+                  )}
                   {lead.data_virou_recorrente && (
                     <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-semibold bg-status-purple-light text-status-purple">
                       Paciente ativo

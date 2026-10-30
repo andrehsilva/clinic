@@ -68,17 +68,21 @@ describe('resolverFunil', () => {
 })
 
 describe('aplicarLayoutSimplificado', () => {
-  it('shows Reagendar inside the renamed Em conversa column', () => {
+  it('merges Reagendar and Reengajamento into negotiation', () => {
     const originais = etapasPadrao('odontologica')
     const f = resolverFunil(aplicarLayoutSimplificado(originais))
 
-    expect(chaves(f.visiveis)).toHaveLength(8)
+    expect(chaves(f.visiveis)).toHaveLength(7)
     expect(chaves(f.visiveis)).toContain('conversando')
     expect(chaves(f.visiveis)).not.toContain('paciente_recorrente')
-    expect(f.labels.conversando).toBe('Em conversa - Reagendamento')
+    expect(chaves(f.visiveis)).toContain('retornar_3_meses')
+    expect(f.labels.conversando).toBe('Orçamento em Negociação')
     expect(f.statusExibido.paciente_recorrente).toBe('conversando')
+    expect(f.statusExibido.follow_up_1_feito).toBe('conversando')
+    expect(f.statusExibido.follow_up_2_feito).toBe('conversando')
+    expect(f.statusExibido.retornar_6_meses).toBe('retornar_3_meses')
+    expect(f.statusExibido.retornar_1_ano).toBe('retornar_3_meses')
   })
-
   it('preserves technical keys and patient rules for automations', () => {
     const originais = etapasPadrao('odontologica')
     const simplificadas = aplicarLayoutSimplificado(originais)

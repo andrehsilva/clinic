@@ -24,6 +24,7 @@ interface Lead {
   created_at: string
   arquivado: boolean
   arquivado_em: string | null
+  tag_paciente_recorrente: boolean
 }
 
 type Tab = 'leads' | 'pacientes' | 'ex_pacientes'
@@ -306,7 +307,7 @@ export default function Leads() {
     const to = from + PAGE_SIZE - 1
     const { data, error, count } = await supabase
       .from('leads_clinica')
-      .select('id, nome_lead, whatsapp_lead, procedimento_interesse, status, inicio_atendimento, data_agendamento, created_at, arquivado, arquivado_em', { count: 'exact' })
+      .select('id, nome_lead, whatsapp_lead, procedimento_interesse, status, inicio_atendimento, data_agendamento, created_at, arquivado, arquivado_em, tag_paciente_recorrente', { count: 'exact' })
       .eq('clinica_id', clinicaId)
       .order('created_at', { ascending: false })
       .range(from, to)
@@ -348,8 +349,8 @@ export default function Leads() {
       })
       list = list.filter(l => !l.arquivado)
       list = tab === 'leads'
-        ? list.filter(l => !pacienteKeys.includes(l.status))
-        : list.filter(l => pacienteKeys.includes(l.status))
+        ? list.filter(l => !pacienteKeys.includes(l.status) && !l.tag_paciente_recorrente)
+        : list.filter(l => pacienteKeys.includes(l.status) || l.tag_paciente_recorrente)
     }
 
     // Search
@@ -370,8 +371,8 @@ export default function Leads() {
     return list
   }, [leads, tab, search, range.from, range.to, sortDir, pacienteKeys])
 
-  const leadsCount = useMemo(() => leads.filter(l => !l.arquivado && !pacienteKeys.includes(l.status)).length, [leads, pacienteKeys])
-  const patientsCount = useMemo(() => leads.filter(l => !l.arquivado && pacienteKeys.includes(l.status)).length, [leads, pacienteKeys])
+  const leadsCount = useMemo(() => leads.filter(l => !l.arquivado && !pacienteKeys.includes(l.status) && !l.tag_paciente_recorrente).length, [leads, pacienteKeys])
+  const patientsCount = useMemo(() => leads.filter(l => !l.arquivado && (pacienteKeys.includes(l.status) || l.tag_paciente_recorrente)).length, [leads, pacienteKeys])
   const exPatientsCount = useMemo(() => leads.filter(l => l.arquivado).length, [leads])
 
   const toggleArquivado = async (lead: Lead) => {
@@ -444,7 +445,7 @@ export default function Leads() {
           </div>
           <div>
             <p className="text-sm font-semibold text-text-primary">Pacientes (Clientes)</p>
-            <p className="text-xs text-text-secondary mt-0.5">Pessoas que já tiveram a consulta realizada ou são pacientes recorrentes</p>
+            <p className="text-xs text-text-secondary mt-0.5">Pessoas com consulta realizada ou marcadas como Paciente Recorrente</p>
           </div>
         </div>
       </div>

@@ -137,7 +137,8 @@ export const MAPA_PADRAO: Record<string, string> = {
 
 /** Dobras do layout enxuto; as chaves técnicas e regras permanecem inalteradas. */
 export const DOBRAS_LAYOUT_SIMPLIFICADO: Record<string, string> = {
-  follow_up_2_feito: 'follow_up_1_feito',
+  follow_up_1_feito: 'conversando',
+  follow_up_2_feito: 'conversando',
   follow_up_3_feito: 'consulta_confirmada',
   consulta_realizada: 'orcamento_pendente',
   paciente_recorrente: 'conversando',
@@ -152,7 +153,7 @@ export function aplicarLayoutSimplificado(etapas: Etapa[]): Etapa[] {
     const destino = DOBRAS_LAYOUT_SIMPLIFICADO[e.chave]
     return {
       ...e,
-      rotulo: e.chave === 'conversando' ? 'Em conversa - Reagendamento' : e.rotulo,
+      rotulo: e.chave === 'conversando' ? 'Orçamento em Negociação' : e.rotulo,
       mapeia_para: destino ? (chaves.has(destino) ? destino : null) : null,
     }
   })
