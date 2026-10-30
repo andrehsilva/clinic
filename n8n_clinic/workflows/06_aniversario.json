@@ -1,0 +1,429 @@
+{
+  "name": "06 - Mensagem de aniversário",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 06 — Aniversário\nDe hora em hora, 9h–17h (SP). Usa `aniversariantes_do_dia()` (migration 025) com a sessão WAHA da clínica. A mensagem vem pronta do banco ({nome}/{clinica} já trocados) e o envio é marcado em `ultimo_aniversario_enviado`.",
+        "width": 600,
+        "height": 210,
+        "color": 4
+      },
+      "id": "bc8088e9-d67c-5dcc-ae56-4b7d8d60ee92",
+      "name": "Nota 0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "cronExpression",
+              "expression": "0 0 9-17 * * *"
+            }
+          ]
+        }
+      },
+      "id": "30c0ff34-b87e-5909-bab5-95c4166edf09",
+      "name": "Agendamento",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "71e9a8a3-d86f-5bef-9e06-c42fcdc70df2",
+              "name": "supabase_url",
+              "value": "https://SEU-PROJETO.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "8af36af8-4c92-5d47-85cb-747ca71050f9",
+              "name": "waha_url",
+              "value": "https://SEU-WAHA.exemplo.com",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8376b0ba-b8c7-5e9d-a6d7-7abcd948b4c4",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_aniversariantes_do_dia",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {}
+      },
+      "id": "c8c25251-2ca3-594b-82e2-88663ad43554",
+      "name": "Buscar elegiveis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "751ffc3b-d17e-50f3-9b53-b55137e8a1b0",
+      "name": "Cada lead",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        780,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json;\nreturn { json: { ...j, texto: j.mensagem, chat: `${j.whatsapp_lead}@c.us` } };"
+      },
+      "id": "67bc739b-eec4-5f68-9380-15d270d6c99a",
+      "name": "Preparar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "82b9275c-6076-595e-b8fb-d1a15b070ded",
+              "leftValue": "={{ $('Preparar').item.json.texto }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "16e5f127-7893-5a0f-a445-dc31251d4f38",
+      "name": "Tem texto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1820,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.waha_url }}/api/startTyping",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ session: $('Preparar').item.json.waha_session, chatId: $('Preparar').item.json.chat }) }}",
+        "options": {}
+      },
+      "id": "3ee6bdd3-23ce-53b3-92b5-796cb9253e92",
+      "name": "Digitando",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2080,
+        190
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "WAHA X-Api-Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.min(Math.max(Math.ceil(String($('Preparar').item.json.texto).length / 20), 1), 5) }}",
+        "unit": "seconds"
+      },
+      "id": "2ed01957-fb5c-5b2c-ae3c-dab013153cfe",
+      "name": "Pausa",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2340,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.waha_url }}/api/sendText",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ session: $('Preparar').item.json.waha_session, chatId: $('Preparar').item.json.chat, text: $('Preparar').item.json.texto }) }}",
+        "options": {}
+      },
+      "id": "8bc12db6-bef8-5c1d-a4de-29fc2e26b07c",
+      "name": "Enviar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2600,
+        190
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "WAHA X-Api-Key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "operation": "incr",
+        "key": "={{ 'bot_msg:' + (typeof $json.id === 'object' ? $json.id._serialized : $json.id) }}",
+        "expire": true,
+        "ttl": 180
+      },
+      "id": "f002d8ce-2231-5e47-87bc-38d5f2492bac",
+      "name": "Marcar envio",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2860,
+        190
+      ],
+      "credentials": {
+        "redis": {
+          "id": "",
+          "name": "Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/marcar_aniversario_enviado",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_lead: $('Preparar').item.json.lead_id }) }}",
+        "options": {}
+      },
+      "id": "2f41318d-438b-5cf4-b0d1-8299f12e8c67",
+      "name": "Marcar aniversario",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        190
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": "={{ 20 + Math.floor(Math.random() * 40) }}",
+        "unit": "seconds"
+      },
+      "id": "16cc7b9f-c31f-5f82-a08f-e1499eaae8a2",
+      "name": "Intervalo anti-ban",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3380,
+        190
+      ]
+    }
+  ],
+  "connections": {
+    "Agendamento": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Buscar elegiveis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar elegiveis": {
+      "main": [
+        [
+          {
+            "node": "Cada lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cada lead": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Preparar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar": {
+      "main": [
+        [
+          {
+            "node": "Tem texto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Digitando": {
+      "main": [
+        [
+          {
+            "node": "Pausa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pausa": {
+      "main": [
+        [
+          {
+            "node": "Enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar": {
+      "main": [
+        [
+          {
+            "node": "Marcar envio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem texto?": {
+      "main": [
+        [
+          {
+            "node": "Digitando",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar envio": {
+      "main": [
+        [
+          {
+            "node": "Marcar aniversario",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar aniversario": {
+      "main": [
+        [
+          {
+            "node": "Intervalo anti-ban",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intervalo anti-ban": {
+      "main": [
+        [
+          {
+            "node": "Cada lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "active": false
+}

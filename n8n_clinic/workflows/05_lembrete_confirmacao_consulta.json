@@ -1,0 +1,429 @@
+{
+  "name": "05 - Lembrete e confirmação de consulta",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 05 — Lembrete de consulta\nA cada 30 min (RPC só devolve das 9h às 18h59). Consultas `agendada` para AMANHÃ cujo lead está em `consulta_agendada` recebem o lembrete e passam para `follow_up_3_feito` (\"Aguardando Confirmação\").\nQuando o paciente responde \"sim\", o agente do fluxo 01 chama `confirmar_presenca` → `consulta_confirmada`.",
+        "width": 600,
+        "height": 210,
+        "color": 4
+      },
+      "id": "6476c633-aa08-5ac9-99a8-53343007a681",
+      "name": "Nota 0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "rule": {
+          "interval": [
+            {
+              "field": "minutes",
+              "minutesInterval": 30
+            }
+          ]
+        }
+      },
+      "id": "e94d11a3-e5a4-520c-964d-05132e32296a",
+      "name": "Agendamento",
+      "type": "n8n-nodes-base.scheduleTrigger",
+      "typeVersion": 1.2,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "71e9a8a3-d86f-5bef-9e06-c42fcdc70df2",
+              "name": "supabase_url",
+              "value": "https://SEU-PROJETO.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "8af36af8-4c92-5d47-85cb-747ca71050f9",
+              "name": "waha_url",
+              "value": "https://SEU-WAHA.exemplo.com",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "78fc0358-467c-5e78-9cbb-4e3342b46d2c",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_lembretes_consulta",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({}) }}",
+        "options": {}
+      },
+      "id": "9a99722e-a03b-57ce-8aa4-814791af4624",
+      "name": "Buscar elegiveis",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "eb7e6582-01ca-5bc8-a248-625d5febd61c",
+      "name": "Cada lead",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        780,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForEachItem",
+        "jsCode": "const j = $json;\nconst nome = (j.nome_lead || '').trim().split(/\\s+/)[0];\nconst consulta = 'consulta';\nconst texto = `Oi${nome ? ', ' + nome : ''}! Passando para lembrar da sua ${consulta} amanhã, ${j.data_local}, na ${j.nome_clinica}. Você confirma presença? 😊`;\nreturn { json: { ...j, texto, chat: `${j.whatsapp_lead}@c.us` } };\n"
+      },
+      "id": "11905da4-36a3-576f-a9c1-8cece5b95bc5",
+      "name": "Preparar",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "82b9275c-6076-595e-b8fb-d1a15b070ded",
+              "leftValue": "={{ $('Preparar').item.json.texto }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "ca679427-e259-5090-8bb1-a5c185d17ce1",
+      "name": "Tem texto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1820,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.waha_url }}/api/startTyping",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ session: $('Preparar').item.json.waha_session, chatId: $('Preparar').item.json.chat }) }}",
+        "options": {}
+      },
+      "id": "507fa183-24d2-51fe-a9c0-57f8610932f6",
+      "name": "Digitando",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2080,
+        190
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "WAHA X-Api-Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.min(Math.max(Math.ceil(String($('Preparar').item.json.texto).length / 20), 1), 5) }}",
+        "unit": "seconds"
+      },
+      "id": "359a31b2-471a-5a90-8347-88d71222b18d",
+      "name": "Pausa",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2340,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.waha_url }}/api/sendText",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ session: $('Preparar').item.json.waha_session, chatId: $('Preparar').item.json.chat, text: $('Preparar').item.json.texto }) }}",
+        "options": {}
+      },
+      "id": "700d4a1c-2c86-52ee-bc2f-4e55e0c313af",
+      "name": "Enviar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2600,
+        190
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "WAHA X-Api-Key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "operation": "incr",
+        "key": "={{ 'bot_msg:' + (typeof $json.id === 'object' ? $json.id._serialized : $json.id) }}",
+        "expire": true,
+        "ttl": 180
+      },
+      "id": "633277a6-6e5b-5768-868b-23e8390e3702",
+      "name": "Marcar envio",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2860,
+        190
+      ],
+      "credentials": {
+        "redis": {
+          "id": "",
+          "name": "Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_marcar_lembrete",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_lead: $('Preparar').item.json.lead_id }) }}",
+        "options": {}
+      },
+      "id": "91550312-3b2e-551e-a3c3-38648130c857",
+      "name": "Marcar lembrete",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        3120,
+        190
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": "={{ 20 + Math.floor(Math.random() * 40) }}",
+        "unit": "seconds"
+      },
+      "id": "bd0f7b56-7e0e-534c-a26e-d1a696c4b155",
+      "name": "Intervalo anti-ban",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3380,
+        190
+      ]
+    }
+  ],
+  "connections": {
+    "Agendamento": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Buscar elegiveis",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Buscar elegiveis": {
+      "main": [
+        [
+          {
+            "node": "Cada lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cada lead": {
+      "main": [
+        [],
+        [
+          {
+            "node": "Preparar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Preparar": {
+      "main": [
+        [
+          {
+            "node": "Tem texto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Digitando": {
+      "main": [
+        [
+          {
+            "node": "Pausa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Pausa": {
+      "main": [
+        [
+          {
+            "node": "Enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Enviar": {
+      "main": [
+        [
+          {
+            "node": "Marcar envio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem texto?": {
+      "main": [
+        [
+          {
+            "node": "Digitando",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar envio": {
+      "main": [
+        [
+          {
+            "node": "Marcar lembrete",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marcar lembrete": {
+      "main": [
+        [
+          {
+            "node": "Intervalo anti-ban",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Intervalo anti-ban": {
+      "main": [
+        [
+          {
+            "node": "Cada lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "active": false
+}

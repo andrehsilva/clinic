@@ -1,0 +1,17 @@
+{
+  "id": "evt_01-exemplo",
+  "timestamp": 1730300000000,
+  "event": "message",
+  "session": "default",
+  "me": { "id": "5516999990000@c.us", "pushName": "Clinica Teste" },
+  "payload": {
+    "id": "false_5516988887777@c.us_3EB0EXEMPLO0001",
+    "timestamp": 1730300000,
+    "from": "5516988887777@c.us",
+    "fromMe": false,
+    "to": "5516999990000@c.us",
+    "body": "Oi! Queria saber sobre clareamento",
+    "hasMedia": false,
+    "_data": { "notifyName": "Joao Pedro" }
+  }
+}

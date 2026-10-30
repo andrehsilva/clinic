@@ -1,0 +1,2078 @@
+{
+  "name": "01 - Atendimento WhatsApp (WAHA)",
+  "nodes": [
+    {
+      "parameters": {
+        "content": "## 01 — Atendimento WhatsApp\nWebhook do WAHA → resolve a clínica pela sessão → registra o lead → debounce → agente (tools = RPCs do Supabase) → envia pelo WAHA → extrai dados para o CRM.\n\n**Antes de ativar:** aplicar `sql/031_n8n_waha.sql`, ligar as 4 credenciais, ajustar a Config (URLs) e apontar o webhook do WAHA para a URL de produção deste fluxo.",
+        "width": 560,
+        "height": 200,
+        "color": 4
+      },
+      "id": "05e229df-b61a-5fe5-ad19-e591dc413c7b",
+      "name": "Nota 0",
+      "type": "n8n-nodes-base.stickyNote",
+      "typeVersion": 1,
+      "position": [
+        0,
+        -380
+      ]
+    },
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "waha/atendimento",
+        "options": {}
+      },
+      "id": "da8ba89f-df6e-5764-8fbb-fe8a0da6c137",
+      "name": "Webhook WAHA",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        0
+      ],
+      "webhookId": "74b8d608-41e8-5726-bfdc-4f67f3e3cb0d"
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "71e9a8a3-d86f-5bef-9e06-c42fcdc70df2",
+              "name": "supabase_url",
+              "value": "https://SEU-PROJETO.supabase.co",
+              "type": "string"
+            },
+            {
+              "id": "8af36af8-4c92-5d47-85cb-747ca71050f9",
+              "name": "waha_url",
+              "value": "https://SEU-WAHA.exemplo.com",
+              "type": "string"
+            },
+            {
+              "id": "284a6798-3694-55b6-a773-1611ca56906d",
+              "name": "detectar_humano",
+              "value": false,
+              "type": "boolean"
+            },
+            {
+              "id": "1b951acf-1096-5e87-9d24-608141227739",
+              "name": "debounce_segundos",
+              "value": 6,
+              "type": "number"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "58807604-34b1-551b-b551-fc83efcfe9aa",
+      "name": "Config",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "9ee572a6-951b-5aaa-80b7-0b6d2a5c7ceb",
+              "name": "session",
+              "value": "={{ $('Webhook WAHA').first().json.body.session }}",
+              "type": "string"
+            },
+            {
+              "id": "f9aa2bc9-027b-5bf7-9a73-cc3985ae87b7",
+              "name": "evento",
+              "value": "={{ $('Webhook WAHA').first().json.body.event }}",
+              "type": "string"
+            },
+            {
+              "id": "fe95b4c1-4dd5-5ea4-ac96-3471537294a3",
+              "name": "fromMe",
+              "value": "={{ $('Webhook WAHA').first().json.body.payload.fromMe === true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "ed1752e0-bc1b-5fa6-b87d-5c9126190371",
+              "name": "msgId",
+              "value": "={{ $('Webhook WAHA').first().json.body.payload.id }}",
+              "type": "string"
+            },
+            {
+              "id": "ce647485-eec1-51b4-a211-f4e83a7fed4c",
+              "name": "texto",
+              "value": "={{ $('Webhook WAHA').first().json.body.payload.body || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "3476cfb6-cb24-5c45-be69-482cb2f48456",
+              "name": "hasMedia",
+              "value": "={{ $('Webhook WAHA').first().json.body.payload.hasMedia === true }}",
+              "type": "boolean"
+            },
+            {
+              "id": "fbaf706e-6a88-56bb-abe1-8939a07264ec",
+              "name": "mediaUrl",
+              "value": "={{ $('Webhook WAHA').first().json.body.payload.media?.url || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "4adcc75c-6544-5d6e-b5bc-8377a63eea79",
+              "name": "mediaMime",
+              "value": "={{ $('Webhook WAHA').first().json.body.payload.media?.mimetype || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "8185ca2f-0359-535e-a0ec-6f4b4646b4f6",
+              "name": "pushName",
+              "value": "={{ $('Webhook WAHA').first().json.body._data?.notifyName || $('Webhook WAHA').first().json.body.payload._data?.notifyName || '' }}",
+              "type": "string"
+            },
+            {
+              "id": "6558ebe2-a377-5641-b56e-6b865440be2a",
+              "name": "contraparte",
+              "value": "={{ $('Webhook WAHA').first().json.body.payload.fromMe ? $('Webhook WAHA').first().json.body.payload.to : $('Webhook WAHA').first().json.body.payload.from }}",
+              "type": "string"
+            },
+            {
+              "id": "af36da83-cdd5-5b68-8f08-e0ee9f4f666f",
+              "name": "telefone",
+              "value": "={{ String($('Webhook WAHA').first().json.body.payload.fromMe ? $('Webhook WAHA').first().json.body.payload.to : $('Webhook WAHA').first().json.body.payload.from).replace(/\\D/g, '') }}",
+              "type": "string"
+            },
+            {
+              "id": "2cac40a8-b0fe-5b27-907e-23b2d5fa2c8b",
+              "name": "ignorar",
+              "value": "={{ /@(g\\.us|newsletter|broadcast)/.test(String($('Webhook WAHA').first().json.body.payload.fromMe ? $('Webhook WAHA').first().json.body.payload.to : $('Webhook WAHA').first().json.body.payload.from)) || String($('Webhook WAHA').first().json.body.payload.from).includes('status@') || (!$('Webhook WAHA').first().json.body.payload.body && $('Webhook WAHA').first().json.body.payload.hasMedia !== true) }}",
+              "type": "boolean"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "7bd9f162-cdda-5382-80a2-7b20d0e34672",
+      "name": "Normalizar",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        520,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "b9725b72-4811-50f7-9660-74a76d1f4b93",
+              "leftValue": "={{ $json.ignorar }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "d06805bd-b1dd-5c47-abef-039a6e993780",
+              "leftValue": "={{ $json.telefone }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "5f12c3c4-9144-5668-9c0a-ebc94f693aec",
+      "name": "Mensagem valida?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        780,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_resolver_clinica",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_session: $json.session }) }}",
+        "options": {}
+      },
+      "id": "269890d2-d4e0-5983-bf1f-c576daaa98fe",
+      "name": "Clinica",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        0
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "17bfd802-e96f-56fc-8de3-04099fda401c",
+              "leftValue": "={{ $json.automacao_ativa }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "d93fb041-a45d-5d30-ae8c-696447c2b280",
+      "name": "Automacao ativa?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1300,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "166dab64-6818-5d68-bb26-a7a6c15859c3",
+              "leftValue": "={{ $('Normalizar').first().json.fromMe }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "b19e05b5-6367-547b-a34a-ec8b989a70cc",
+      "name": "Mensagem do celular?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1560,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "55c2f069-3b34-53e5-9751-fd23d5f024c3",
+              "leftValue": "={{ $('Config').first().json.detectar_humano }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "aedf13ac-8e30-5999-a4dc-bc97d0fd2a7d",
+      "name": "Detectar humano?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        1820,
+        -190
+      ]
+    },
+    {
+      "parameters": {
+        "amount": 4,
+        "unit": "seconds"
+      },
+      "id": "6544b1d7-ebd7-5f63-9fe4-875b952fef70",
+      "name": "Aguardar marca",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        2080,
+        -190
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "marca",
+        "key": "={{ 'bot_msg:' + $('Normalizar').first().json.msgId }}",
+        "keyType": "string",
+        "options": {}
+      },
+      "id": "8ec7243e-7855-5d82-8191-98110531b88c",
+      "name": "Marca do bot",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        2340,
+        -190
+      ],
+      "credentials": {
+        "redis": {
+          "id": "",
+          "name": "Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5801742d-c763-5140-9b53-3a52b7cc5156",
+              "leftValue": "={{ $json.marca }}",
+              "operator": {
+                "type": "string",
+                "operation": "empty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "90ebf34f-8a80-56be-8cd3-35bda53ab6b3",
+      "name": "Foi o bot?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2600,
+        -190
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_chamar_humano",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_clinica: $('Clinica').first().json.clinica_id, p_telefone: $('Normalizar').first().json.telefone, p_motivo: 'Atendente respondeu pelo celular' }) }}",
+        "options": {}
+      },
+      "id": "e55fcf9e-c58d-5562-b7b9-92f04500847d",
+      "name": "Humano assumiu",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2860,
+        -190
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_registrar_mensagem_lead",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_clinica: $('Clinica').first().json.clinica_id, p_telefone: $('Normalizar').first().json.telefone, p_nome: $('Normalizar').first().json.pushName }) }}",
+        "options": {}
+      },
+      "id": "c8042114-4286-5add-bf97-54d7bbf1ec67",
+      "name": "Registrar lead",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1820,
+        190
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "5fbeb9f8-b358-5198-ad51-f5f415d4df4c",
+              "leftValue": "={{ $json.atendimento_manual }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "8284eea0-c0d5-5b9d-b02f-0bd3a4712ed8",
+              "leftValue": "={{ $json.arquivado }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "21263054-5697-5f5f-8740-9eadf7a87680",
+      "name": "Bot responde?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        2080,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "4ad92ac4-b09f-52fe-9159-919ea02a0ea7",
+                    "leftValue": "={{ $('Normalizar').first().json.mediaMime }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "rightValue": "audio"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "audio"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "loose",
+                  "version": 2
+                },
+                "conditions": [
+                  {
+                    "id": "435e456c-dc1e-5021-9146-b4154ea5b692",
+                    "leftValue": "={{ $('Normalizar').first().json.mediaMime }}",
+                    "operator": {
+                      "type": "string",
+                      "operation": "startsWith"
+                    },
+                    "rightValue": "image"
+                  }
+                ],
+                "combinator": "and"
+              },
+              "renameOutput": true,
+              "outputKey": "imagem"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "extra",
+          "renameFallbackOutput": "texto"
+        }
+      },
+      "id": "f7200c99-e47c-5fb5-ac13-1726947e4a74",
+      "name": "Tipo de mensagem",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3.2,
+      "position": [
+        2340,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.waha_url + $('Normalizar').first().json.mediaUrl.replace(/^https?:\\/\\/[^\\/]+/, '') }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "d0b71559-deec-5f67-a7d8-9a2e05dff441",
+      "name": "Baixar audio",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2600,
+        190
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "WAHA X-Api-Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.waha_url + $('Normalizar').first().json.mediaUrl.replace(/^https?:\\/\\/[^\\/]+/, '') }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "options": {
+          "response": {
+            "response": {
+              "responseFormat": "file",
+              "outputPropertyName": "data"
+            }
+          }
+        }
+      },
+      "id": "293c1b84-325a-5d1c-92e8-f15e717ea947",
+      "name": "Baixar imagem",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2600,
+        380
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "WAHA X-Api-Key"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "audio",
+        "operation": "transcribe",
+        "binaryPropertyName": "data",
+        "options": {
+          "language": "pt"
+        }
+      },
+      "id": "78447332-d99f-5daa-b47f-dbfe82ab379d",
+      "name": "Transcrever audio",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        2860,
+        190
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "resource": "image",
+        "operation": "analyze",
+        "inputType": "base64",
+        "binaryPropertyName": "data",
+        "modelId": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4o-mini"
+        },
+        "text": "Descreva objetivamente o que aparece nesta imagem enviada por um paciente (em português, até 3 frases).",
+        "simplify": true,
+        "options": {}
+      },
+      "id": "da75461c-07e8-5f77-ae4e-e9c4b9194a96",
+      "name": "Descrever imagem",
+      "type": "@n8n/n8n-nodes-langchain.openAi",
+      "typeVersion": 2.1,
+      "position": [
+        2860,
+        380
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "edd3a742-b885-5031-9d1c-dd2cb8b8a5a2",
+              "name": "texto",
+              "value": "={{ '[Áudio do paciente transcrito] ' + ($json.text || $json.transcription || '') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "dd1b9a12-c165-532d-827d-39660eb79faf",
+      "name": "Texto do audio",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3120,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "518690eb-b503-583c-ab5b-37c9e2049609",
+              "name": "texto",
+              "value": "={{ '[O paciente enviou uma imagem: ' + ($json.content || $json.text || 'sem descrição') + ']' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "4c1b3153-9558-502e-b9ce-d064e3bb7e4f",
+      "name": "Texto da imagem",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3120,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "8344307f-7229-5c77-acc7-e0177b4eebd7",
+              "name": "texto",
+              "value": "={{ $('Normalizar').first().json.texto }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "8ddc5e4a-a34a-5ca4-9205-6e35b6ecdf91",
+      "name": "Texto puro",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        3120,
+        570
+      ]
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "3c89b623-9f85-5957-9823-395fed40303c",
+              "leftValue": "={{ $json.texto }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "38caed9c-1c0f-5896-b3db-73c9fe010372",
+      "name": "Tem texto?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        3380,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "push",
+        "list": "={{ 'buf:' + $('Clinica').first().json.clinica_id + ':' + $('Normalizar').first().json.telefone }}",
+        "messageData": "={{ $json.texto }}",
+        "tail": true
+      },
+      "id": "842cd0a8-38b7-5e1b-b0db-28fc4d9164e9",
+      "name": "Guardar no buffer",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        3640,
+        190
+      ],
+      "credentials": {
+        "redis": {
+          "id": "",
+          "name": "Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "amount": "={{ $('Config').first().json.debounce_segundos }}",
+        "unit": "seconds"
+      },
+      "id": "9730b2db-5e43-50e9-b836-2313444e4a23",
+      "name": "Debounce",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        3900,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "get",
+        "propertyName": "buffer",
+        "key": "={{ 'buf:' + $('Clinica').first().json.clinica_id + ':' + $('Normalizar').first().json.telefone }}",
+        "keyType": "list",
+        "options": {}
+      },
+      "id": "c551670c-aa63-52c0-99d3-50403b6c2fa3",
+      "name": "Ler buffer",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        4160,
+        190
+      ],
+      "credentials": {
+        "redis": {
+          "id": "",
+          "name": "Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "4762f2a0-86fe-5833-88b5-0c9da5ed9975",
+              "leftValue": "={{ ($json.buffer || []).length ? $json.buffer[$json.buffer.length - 1] : '' }}",
+              "operator": {
+                "type": "string",
+                "operation": "equals"
+              },
+              "rightValue": "={{ $('Tem texto?').first().json.texto }}"
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "391697af-3d5e-544d-87d2-f51042c6ee47",
+      "name": "Sou a ultima?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        4420,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "5a59a2c0-b77e-5cf4-8df5-8644e9a1f29e",
+              "name": "mensagem",
+              "value": "={{ ($('Ler buffer').first().json.buffer || []).join('\\n') }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "id": "caebb3d9-8f71-5a98-aae7-189e2d15d543",
+      "name": "Concatenar",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        4680,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "delete",
+        "key": "={{ 'buf:' + $('Clinica').first().json.clinica_id + ':' + $('Normalizar').first().json.telefone }}"
+      },
+      "id": "d47fd4be-d9a0-5e5d-9623-a1620c3e422e",
+      "name": "Apagar buffer",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        4940,
+        190
+      ],
+      "credentials": {
+        "redis": {
+          "id": "",
+          "name": "Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const c = $('Clinica').first().json;\nconst l = $('Registrar lead').first().json;\nconst N = $('Normalizar').first().json;\nconst bruto = $('Concatenar').first().json.mensagem;\n\nconst tz = 'America/Sao_Paulo';\nconst DIAS = ['domingo','segunda-feira','terça-feira','quarta-feira','quinta-feira','sexta-feira','sábado'];\nconst agora = new Date();\nconst iso = (d) => d.toLocaleDateString('en-CA', { timeZone: tz });\nconst dm = (d) => d.toLocaleDateString('pt-BR', { timeZone: tz, day: '2-digit', month: '2-digit' });\nconst dow = (d) => DIAS[new Date(d.toLocaleString('en-US', { timeZone: tz })).getDay()];\nconst proximos = [];\nfor (let i = 0; i < 10; i++) {\n  const d = new Date(agora.getTime() + i * 86400000);\n  proximos.push(`- ${dow(d)}, ${dm(d)} (${iso(d)})${i === 0 ? ' — hoje' : i === 1 ? ' — amanhã' : ''}`);\n}\nconst horaAgora = agora.toLocaleTimeString('pt-BR', { timeZone: tz, hour: '2-digit', minute: '2-digit' });\n\nconst tipo = { estetica: 'uma clínica de estética', medica: 'uma clínica médica', odontologica: 'uma clínica odontológica', generico: 'uma clínica' }[c.nicho] || 'uma clínica';\nconst consulta = c.nicho === 'odontologica' ? 'avaliação' : 'consulta';\n\nconst servicos = (c.servicos || []).map(s => `- ${s.nome}${s.descricao ? ': ' + s.descricao : ''}`).join('\\n') || '- (nenhum serviço cadastrado: peça para a secretaria detalhar e chame chamar_humano)';\nconst horarios = (c.horarios || []).map(h => `- ${DIAS[h.dia_semana]}: ${h.hora_inicio} às ${h.hora_fim}`).join('\\n') || '- (horários não cadastrados)';\n\nconst etapa = {\n  consulta_agendada: `O paciente JÁ TEM ${consulta} agendada para ${l.data_agendamento ? new Date(l.data_agendamento).toLocaleString('pt-BR', { timeZone: tz, dateStyle: 'short', timeStyle: 'short' }) : 'uma data já marcada'}. Não agende outra: ofereça reagendar_consulta ou cancelar_consulta se ele pedir.`,\n  follow_up_3_feito: `O paciente JÁ TEM ${consulta} agendada para ${l.data_agendamento ? new Date(l.data_agendamento).toLocaleString('pt-BR', { timeZone: tz, dateStyle: 'short', timeStyle: 'short' }) : 'amanhã'} e recebeu um lembrete pedindo confirmação. Se ele confirmar presença, use confirmar_presenca. Se pedir outro horário, use reagendar_consulta; se desistir, cancelar_consulta.`,\n  consulta_confirmada: `O paciente JÁ TEM ${consulta} CONFIRMADA. Não agende outra: ajude com dúvidas, reagendamento ou cancelamento.`,\n  orcamento_pendente: `É paciente que já fez ${consulta} e aguarda o retorno da clínica. Seja cordial e, se pedir novo horário, agende normalmente.`,\n}[l.status] || '';\n\nconst nome = l.nome_lead ? `O nome do contato é ${l.nome_lead}.` : 'Você ainda não sabe o nome do contato: pergunte de forma natural.';\n\nconst system = `# IDENTIDADE\nVocê é a assistente virtual de atendimento da ${c.nome_clinica}, ${tipo}. Você conversa com pacientes pelo WhatsApp.\nSe perguntarem, diga com naturalidade que é a assistente virtual da clínica. Nunca finja ser uma pessoa.\n\n# FUNÇÃO\n- Atender quem chega pelo WhatsApp, entender o que a pessoa precisa e conduzir, sem pressão, ao agendamento da ${consulta}.\n- Responder dúvidas usando SOMENTE as informações da seção DADOS DA CLÍNICA.\n\n# TOM DE VOZ\n- Acolhedor, humano e objetivo. Português do Brasil, linguagem de WhatsApp.\n- Mensagens curtas (no máximo 2 frases por parágrafo). Separe cada mensagem com uma linha em branco. No máximo 3 mensagens por resposta.\n- Faça UMA pergunta por vez. Use emojis com moderação. Não use markdown (sem **, #, listas com hífen).\n- Não repita o nome da pessoa a cada mensagem.\n\n# FLUXO\n1. Cumprimente e, se ainda não souber, pergunte o nome.\n2. Entenda o que a pessoa procura (use a lista de serviços; não invente serviços).\n3. Explique que o próximo passo é a ${consulta} e ofereça marcar.\n4. Peça o dia e o horário de preferência. SEMPRE chame ver_horarios antes de sugerir horários. Ofereça no máximo 3 opções.\n5. Peça o nome completo (se ainda não tiver) e chame agendar_consulta com a data e hora escolhidas.\n6. Confirme dia e horário em uma mensagem curta e finalize com carinho.\n\n# REGRAS\n- Nunca invente preços, prazos, horários, procedimentos ou endereço. Se a informação não estiver nos DADOS DA CLÍNICA, diga que vai confirmar com a equipe e chame chamar_humano.\n- Não dê diagnóstico, orientação clínica nem prometa resultados.\n- Dor forte, sangramento, febre, reação, urgência ou qualquer queixa clínica: chame chamar_humano na hora e avise que a equipe vai assumir.\n- Se a pessoa pedir para falar com atendente/humano, ou você estiver em dúvida: chame chamar_humano.\n- Só afirme que agendou depois que agendar_consulta retornar ok. Se retornar erro, explique de forma simples e ofereça outras opções (ver_horarios).\n- Datas sempre no formato dd/mm (sem ano) para o paciente; para as ferramentas use AAAA-MM-DD HH:MM no horário de Brasília.\n\n# FERRAMENTAS\n- ver_horarios: lista os horários livres dos próximos dias.\n- agendar_consulta: marca a ${consulta} (data_hora, procedimento, nome_completo).\n- reagendar_consulta: troca o horário da ${consulta} já marcada.\n- cancelar_consulta: cancela a ${consulta} marcada.\n- confirmar_presenca: registra que o paciente confirmou a ${consulta}.\n- chamar_humano: passa o atendimento para a equipe (informe o motivo).\n\n# DADOS DA CLÍNICA\n${c.sobre_clinica || '(sem informações adicionais cadastradas)'}\n\nServiços:\n${servicos}\n\nHorário de atendimento:\n${horarios}\n\n# CONTEXTO ATUAL\nAgora são ${horaAgora} (Brasília). Próximos dias:\n${proximos.join('\\n')}\n${nome}\n${l.procedimento_interesse ? 'Interesse já informado: ' + l.procedimento_interesse + '.' : ''}\n${l.resumo_conversa ? 'Resumo da conversa até aqui: ' + l.resumo_conversa : ''}\n${etapa}`;\n\nreturn [{ json: { system_prompt: system, mensagem: bruto } }];\n"
+      },
+      "id": "0346172f-b91e-54ec-b191-948dab7db9f7",
+      "name": "Montar contexto",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5200,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ $json.mensagem }}",
+        "hasOutputParser": false,
+        "options": {
+          "systemMessage": "={{ $json.system_prompt }}",
+          "maxIterations": 8
+        }
+      },
+      "id": "f2028cfa-a353-54e4-8d29-fe73e1ad250e",
+      "name": "Secretaria IA",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        5460,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4.1-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {
+          "temperature": 0.4
+        }
+      },
+      "id": "029fadb6-94b1-5171-a142-640bf89ae423",
+      "name": "Modelo (agente)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        5200,
+        570
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "sessionIdType": "customKey",
+        "sessionKey": "={{ $('Clinica').first().json.clinica_id + ':' + $('Normalizar').first().json.telefone }}",
+        "sessionTTL": 604800,
+        "contextWindowLength": 20
+      },
+      "id": "d51f6c05-3e54-5980-b0cd-084a6edf01bb",
+      "name": "Memoria da conversa",
+      "type": "@n8n/n8n-nodes-langchain.memoryRedisChat",
+      "typeVersion": 1.5,
+      "position": [
+        5460,
+        570
+      ],
+      "credentials": {
+        "redis": {
+          "id": "",
+          "name": "Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Lista os horários livres da clínica nos próximos dias. Use SEMPRE antes de sugerir ou confirmar um horário.",
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_ver_horarios",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_clinica: $('Clinica').first().json.clinica_id, p_dias: Number($fromAI('dias', 'Quantos dias à frente consultar (padrão 7, máximo 14)', 'number', 7)) }) }}",
+        "options": {}
+      },
+      "id": "1965ba02-31b8-5f13-8e3d-343d4722743a",
+      "name": "ver_horarios",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        5720,
+        570
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Agenda a consulta/avaliação do paciente. Só chame depois de confirmar o horário com ver_horarios. Retorna ok=true ou um erro (ja_agendado, ocupado, fora_horario, passado).",
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_agendar_consulta",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_clinica: $('Clinica').first().json.clinica_id, p_telefone: $('Normalizar').first().json.telefone, p_data_hora: $fromAI('data_hora', 'Data e hora escolhidas, horário de Brasília, formato AAAA-MM-DD HH:MM', 'string'), p_procedimento: $fromAI('procedimento', 'Serviço/procedimento de interesse, ou vazio', 'string', ''), p_nome: $fromAI('nome_completo', 'Nome completo do paciente, ou vazio se não souber', 'string', '') }) }}",
+        "options": {}
+      },
+      "id": "725a59ec-4563-56dd-b35d-9d3aa33cb07d",
+      "name": "agendar_consulta",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        5980,
+        570
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Troca o horário da consulta já marcada do paciente. Confirme o novo horário com ver_horarios antes.",
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_reagendar_consulta",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_clinica: $('Clinica').first().json.clinica_id, p_telefone: $('Normalizar').first().json.telefone, p_data_hora: $fromAI('data_hora', 'Novo horário, formato AAAA-MM-DD HH:MM (Brasília)', 'string') }) }}",
+        "options": {}
+      },
+      "id": "7342206d-9dd7-5f30-9d36-10f204d17139",
+      "name": "reagendar_consulta",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        6240,
+        570
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Cancela a consulta agendada do paciente. Use apenas se o paciente pedir claramente.",
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_cancelar_consulta",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_clinica: $('Clinica').first().json.clinica_id, p_telefone: $('Normalizar').first().json.telefone }) }}",
+        "options": {}
+      },
+      "id": "67e807b2-07bf-5016-8767-93ab6efde822",
+      "name": "cancelar_consulta",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        6500,
+        570
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Registra que o paciente confirmou presença na consulta marcada.",
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_confirmar_consulta",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_clinica: $('Clinica').first().json.clinica_id, p_telefone: $('Normalizar').first().json.telefone }) }}",
+        "options": {}
+      },
+      "id": "e274a1e3-f89b-5443-95e8-92ad9e5f8dd8",
+      "name": "confirmar_presenca",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        6760,
+        570
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "toolDescription": "Passa o atendimento para a equipe humana e pausa o bot para este paciente. Use em urgência/queixa clínica, pedido de atendente ou quando não souber responder.",
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_chamar_humano",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_clinica: $('Clinica').first().json.clinica_id, p_telefone: $('Normalizar').first().json.telefone, p_motivo: $fromAI('motivo', 'Resumo curto do motivo (pedido do paciente, dúvida clínica, urgência...)', 'string') }) }}",
+        "options": {}
+      },
+      "id": "0b82f744-9f7d-57f6-bda7-e1fa0293f4b0",
+      "name": "chamar_humano",
+      "type": "n8n-nodes-base.httpRequestTool",
+      "typeVersion": 4.2,
+      "position": [
+        7020,
+        570
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "const bruto = String($input.first().json.output || '');\nconst limpo = bruto.replace(/\\r/g, '').replace(/\\\\n/g, '\\n')\n  .replace(/\\*\\*(.*?)\\*\\*/g, '$1').replace(/__(.*?)__/g, '$1')\n  .replace(/^#+\\s*/gm, '').replace(/^[-*]\\s+/gm, '');\nconst partes = limpo.split(/\\n\\s*\\n|\\n/).map(s => s.trim()).filter(Boolean);\nconst final = [];\nfor (const p of partes) {\n  if (p.length <= 280) { final.push(p); continue; }\n  let atual = '';\n  for (const frase of p.split(/(?<=[.!?])\\s+/)) {\n    if (atual && (atual + ' ' + frase).length > 280) { final.push(atual.trim()); atual = frase; }\n    else atual = (atual + ' ' + frase).trim();\n  }\n  if (atual) final.push(atual);\n}\nreturn final.slice(0, 6).map(texto => ({ json: { texto } }));"
+      },
+      "id": "87f4abb9-3fc5-5c04-923b-e2ede6b6c2fc",
+      "name": "Dividir resposta",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        5720,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "options": {}
+      },
+      "id": "3ff53cb1-5a5c-5626-8794-983f0c497cf0",
+      "name": "Cada mensagem",
+      "type": "n8n-nodes-base.splitInBatches",
+      "typeVersion": 3,
+      "position": [
+        5980,
+        190
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.waha_url }}/api/startTyping",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ session: $('Normalizar').first().json.session, chatId: $('Normalizar').first().json.contraparte }) }}",
+        "options": {}
+      },
+      "id": "85982bdb-8843-5959-a157-524060f0f581",
+      "name": "Resp Digitando",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6240,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "WAHA X-Api-Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    },
+    {
+      "parameters": {
+        "amount": "={{ Math.min(Math.max(Math.ceil(String($('Cada mensagem').item.json.texto).length / 20), 1), 5) }}",
+        "unit": "seconds"
+      },
+      "id": "edab48ab-e879-5be8-b0d6-474de1fe609c",
+      "name": "Resp Pausa",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        6500,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.waha_url }}/api/sendText",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ session: $('Normalizar').first().json.session, chatId: $('Normalizar').first().json.contraparte, text: $('Cada mensagem').item.json.texto }) }}",
+        "options": {}
+      },
+      "id": "ccb7530d-29e7-5c69-ab24-91819aa81175",
+      "name": "Resp Enviar",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6760,
+        0
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "WAHA X-Api-Key"
+        }
+      },
+      "retryOnFail": true,
+      "maxTries": 2,
+      "waitBetweenTries": 3000
+    },
+    {
+      "parameters": {
+        "operation": "incr",
+        "key": "={{ 'bot_msg:' + (typeof $json.id === 'object' ? $json.id._serialized : $json.id) }}",
+        "expire": true,
+        "ttl": 180
+      },
+      "id": "4afa8c25-ab42-5f3b-920a-6cb251f51255",
+      "name": "Resp Marcar envio",
+      "type": "n8n-nodes-base.redis",
+      "typeVersion": 1,
+      "position": [
+        7020,
+        0
+      ],
+      "credentials": {
+        "redis": {
+          "id": "",
+          "name": "Redis"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "promptType": "define",
+        "text": "={{ 'Resumo anterior: ' + ($('Registrar lead').first().json.resumo_conversa || '(nenhum)') + '\\nNome atual: ' + ($('Registrar lead').first().json.nome_lead || '(desconhecido)') + '\\nPaciente: ' + $('Concatenar').first().json.mensagem + '\\nAtendente: ' + $('Secretaria IA').first().json.output }}",
+        "hasOutputParser": true,
+        "options": {
+          "systemMessage": "Você extrai dados de uma conversa de WhatsApp de uma clínica e preenche o CRM. Nunca invente: se algo não foi dito de forma explícita, devolva string vazia.\n- nome: nome que o contato disse ser o dele (vazio se não disse).\n- procedimento: procedimento/serviço de interesse mencionado (vazio se não houve).\n- resumo_conversa: um único parágrafo curto com o que o contato quer e em que ponto está (agendou, pediu horário, está em dúvida...). Só fatos ditos na conversa; sem preços. Atualize o resumo anterior em vez de repeti-lo.",
+          "maxIterations": 8
+        }
+      },
+      "id": "4fb864d6-17f4-597f-8b09-e05031ad333c",
+      "name": "Extrair dados CRM",
+      "type": "@n8n/n8n-nodes-langchain.agent",
+      "typeVersion": 3.1,
+      "position": [
+        6240,
+        570
+      ]
+    },
+    {
+      "parameters": {
+        "mode": "runOnceForAllItems",
+        "jsCode": "return [{ json: {} }];"
+      },
+      "id": "dde4b7b3-6652-5fe8-9578-ef65dddd70ad",
+      "name": "Uma vez",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        6240,
+        380
+      ]
+    },
+    {
+      "parameters": {
+        "model": {
+          "__rl": true,
+          "mode": "id",
+          "value": "gpt-4.1-mini"
+        },
+        "responsesApiEnabled": false,
+        "options": {
+          "temperature": 0
+        }
+      },
+      "id": "0ed6c686-d07c-51ac-bcbb-26f2ee733139",
+      "name": "Modelo (CRM)",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOpenAi",
+      "typeVersion": 1.3,
+      "position": [
+        6240,
+        950
+      ],
+      "credentials": {
+        "openAiApi": {
+          "id": "",
+          "name": "OpenAI"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "schemaType": "fromJson",
+        "jsonSchemaExample": "{\n  \"nome\": \"\",\n  \"procedimento\": \"\",\n  \"resumo_conversa\": \"\"\n}"
+      },
+      "id": "2155e0d9-955b-5230-ade9-6f33f4ad54f4",
+      "name": "Parser CRM",
+      "type": "@n8n/n8n-nodes-langchain.outputParserStructured",
+      "typeVersion": 1.3,
+      "position": [
+        6500,
+        950
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/rpc/n8n_atualizar_crm",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ p_lead: $('Registrar lead').first().json.lead_id, p_nome: $json.output.nome, p_procedimento: $json.output.procedimento, p_resumo: $json.output.resumo_conversa }) }}",
+        "options": {}
+      },
+      "id": "7d3f8ab8-4a10-567e-92af-e38a959d389e",
+      "name": "Atualizar CRM",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6500,
+        570
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "method": "GET",
+        "url": "={{ $('Config').first().json.supabase_url }}/rest/v1/leads_clinica?id=eq.{{ $('Registrar lead').first().json.lead_id }}&select=atendimento_manual",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "supabaseApi",
+        "options": {}
+      },
+      "id": "5f00877f-ffde-5fa7-8ca9-a99fe91d577d",
+      "name": "Checar handoff",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        6760,
+        570
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "",
+          "name": "Supabase (service_role)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "options": {
+            "caseSensitive": true,
+            "leftValue": "",
+            "typeValidation": "loose",
+            "version": 2
+          },
+          "conditions": [
+            {
+              "id": "165663e4-de50-54d7-9a62-e3bc440d52a5",
+              "leftValue": "={{ $json.atendimento_manual }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "true",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "3de37ac4-0435-50b9-8d2b-cbc4257a17b8",
+              "leftValue": "={{ $('Registrar lead').first().json.atendimento_manual }}",
+              "operator": {
+                "type": "boolean",
+                "operation": "false",
+                "singleValue": true
+              }
+            },
+            {
+              "id": "879f0bc4-b6ee-5ad5-a9d3-0162c82c93a8",
+              "leftValue": "={{ $('Clinica').first().json.whatsapp_aviso_humano }}",
+              "operator": {
+                "type": "string",
+                "operation": "notEmpty",
+                "singleValue": true
+              }
+            }
+          ],
+          "combinator": "and"
+        },
+        "options": {}
+      },
+      "id": "678cfee7-813f-57e4-93d7-ee972f3fb4c4",
+      "name": "Virou humano?",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 2.2,
+      "position": [
+        7020,
+        570
+      ]
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $('Config').first().json.waha_url }}/api/sendText",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ session: $('Normalizar').first().json.session, chatId: $('Clinica').first().json.whatsapp_aviso_humano + '@c.us', text: '⚠️ ' + ($('Registrar lead').first().json.nome_lead || $('Normalizar').first().json.telefone) + ' (' + $('Normalizar').first().json.telefone + ') precisa de atendimento humano. O bot foi pausado para este contato (Atendimento manual no CRM).' }) }}",
+        "options": {}
+      },
+      "id": "cc44afd9-69f2-522a-9216-768c12adb00d",
+      "name": "Avisar secretaria",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        7280,
+        570
+      ],
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "",
+          "name": "WAHA X-Api-Key"
+        }
+      },
+      "onError": "continueRegularOutput"
+    }
+  ],
+  "connections": {
+    "Webhook WAHA": {
+      "main": [
+        [
+          {
+            "node": "Config",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Config": {
+      "main": [
+        [
+          {
+            "node": "Normalizar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Normalizar": {
+      "main": [
+        [
+          {
+            "node": "Mensagem valida?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensagem valida?": {
+      "main": [
+        [
+          {
+            "node": "Clinica",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Clinica": {
+      "main": [
+        [
+          {
+            "node": "Automacao ativa?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Automacao ativa?": {
+      "main": [
+        [
+          {
+            "node": "Mensagem do celular?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Mensagem do celular?": {
+      "main": [
+        [
+          {
+            "node": "Detectar humano?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Registrar lead",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Detectar humano?": {
+      "main": [
+        [
+          {
+            "node": "Aguardar marca",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Aguardar marca": {
+      "main": [
+        [
+          {
+            "node": "Marca do bot",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Marca do bot": {
+      "main": [
+        [
+          {
+            "node": "Foi o bot?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Foi o bot?": {
+      "main": [
+        [
+          {
+            "node": "Humano assumiu",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Registrar lead": {
+      "main": [
+        [
+          {
+            "node": "Bot responde?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Bot responde?": {
+      "main": [
+        [
+          {
+            "node": "Tipo de mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tipo de mensagem": {
+      "main": [
+        [
+          {
+            "node": "Baixar audio",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Baixar imagem",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Texto puro",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar audio": {
+      "main": [
+        [
+          {
+            "node": "Transcrever audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Transcrever audio": {
+      "main": [
+        [
+          {
+            "node": "Texto do audio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Baixar imagem": {
+      "main": [
+        [
+          {
+            "node": "Descrever imagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Descrever imagem": {
+      "main": [
+        [
+          {
+            "node": "Texto da imagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Texto do audio": {
+      "main": [
+        [
+          {
+            "node": "Tem texto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Texto da imagem": {
+      "main": [
+        [
+          {
+            "node": "Tem texto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Texto puro": {
+      "main": [
+        [
+          {
+            "node": "Tem texto?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Tem texto?": {
+      "main": [
+        [
+          {
+            "node": "Guardar no buffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Guardar no buffer": {
+      "main": [
+        [
+          {
+            "node": "Debounce",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Debounce": {
+      "main": [
+        [
+          {
+            "node": "Ler buffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ler buffer": {
+      "main": [
+        [
+          {
+            "node": "Sou a ultima?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Sou a ultima?": {
+      "main": [
+        [
+          {
+            "node": "Concatenar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Concatenar": {
+      "main": [
+        [
+          {
+            "node": "Apagar buffer",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Apagar buffer": {
+      "main": [
+        [
+          {
+            "node": "Montar contexto",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Montar contexto": {
+      "main": [
+        [
+          {
+            "node": "Secretaria IA",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modelo (agente)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Secretaria IA",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Memoria da conversa": {
+      "ai_memory": [
+        [
+          {
+            "node": "Secretaria IA",
+            "type": "ai_memory",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "ver_horarios": {
+      "ai_tool": [
+        [
+          {
+            "node": "Secretaria IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "agendar_consulta": {
+      "ai_tool": [
+        [
+          {
+            "node": "Secretaria IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "reagendar_consulta": {
+      "ai_tool": [
+        [
+          {
+            "node": "Secretaria IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "cancelar_consulta": {
+      "ai_tool": [
+        [
+          {
+            "node": "Secretaria IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "confirmar_presenca": {
+      "ai_tool": [
+        [
+          {
+            "node": "Secretaria IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "chamar_humano": {
+      "ai_tool": [
+        [
+          {
+            "node": "Secretaria IA",
+            "type": "ai_tool",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Secretaria IA": {
+      "main": [
+        [
+          {
+            "node": "Dividir resposta",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Dividir resposta": {
+      "main": [
+        [
+          {
+            "node": "Cada mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp Digitando": {
+      "main": [
+        [
+          {
+            "node": "Resp Pausa",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp Pausa": {
+      "main": [
+        [
+          {
+            "node": "Resp Enviar",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp Enviar": {
+      "main": [
+        [
+          {
+            "node": "Resp Marcar envio",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Cada mensagem": {
+      "main": [
+        [
+          {
+            "node": "Uma vez",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Resp Digitando",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Resp Marcar envio": {
+      "main": [
+        [
+          {
+            "node": "Cada mensagem",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Uma vez": {
+      "main": [
+        [
+          {
+            "node": "Extrair dados CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Modelo (CRM)": {
+      "ai_languageModel": [
+        [
+          {
+            "node": "Extrair dados CRM",
+            "type": "ai_languageModel",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Parser CRM": {
+      "ai_outputParser": [
+        [
+          {
+            "node": "Extrair dados CRM",
+            "type": "ai_outputParser",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Extrair dados CRM": {
+      "main": [
+        [
+          {
+            "node": "Atualizar CRM",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Atualizar CRM": {
+      "main": [
+        [
+          {
+            "node": "Checar handoff",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Checar handoff": {
+      "main": [
+        [
+          {
+            "node": "Virou humano?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Virou humano?": {
+      "main": [
+        [
+          {
+            "node": "Avisar secretaria",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "pinData": {},
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "America/Sao_Paulo"
+  },
+  "active": false
+}
