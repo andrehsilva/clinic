@@ -11,6 +11,7 @@ import { useAuth } from '../contexts/AuthContext'
 import { STATUS_COLORS, DEFAULT_STATUS_COLOR, CONSULTA_STATUS_COLORS } from '../lib/statusColors'
 import { useFunil } from '../hooks/useFunil'
 import { ehOrcamento } from '../lib/funil'
+import { parseNotas, serializeNotas, agruparNotas, type Nota } from '../lib/anotacoes'
 import { fmtDateTime, fmtBRL } from '../lib/format'
 import {
   hasConsultaRealizada, BLOQUEIO_SEM_CONSULTA_MSG,
@@ -43,11 +44,6 @@ interface Lead {
   tag_paciente_recorrente: boolean
   em_tratamento: boolean
   status_atualizado_em: string | null
-}
-
-interface Nota {
-  data: string | null
-  texto: string
 }
 
 interface Consulta {
@@ -109,6 +105,17 @@ function InfoRow({ label, value }: { label: string; value: React.ReactNode }) {
     <div className="flex items-start gap-3 py-2.5 border-b border-border-subtle last:border-0">
       <span className="text-xs text-text-secondary w-40 flex-shrink-0 pt-0.5">{label}</span>
       <span className="text-sm text-text-primary font-medium flex-1">{value || '—'}</span>
+    </div>
+  )
+}
+
+// ─── Resumo de consultas ──────────────────────────────────────────────────────
+function ResumoItem({ label, value, tone }: { label: string; value: React.ReactNode; tone?: 'success' | 'accent' }) {
+  const cor = tone === 'success' ? 'text-success' : tone === 'accent' ? 'text-accent' : 'text-text-primary'
+  return (
+    <div className="rounded-xl border border-border bg-page px-4 py-3">
+      <p className="text-[11px] font-semibold uppercase tracking-wide text-text-secondary">{label}</p>
+      <p className={`mt-1 text-lg font-bold leading-tight tabular-nums ${cor}`}>{value}</p>
     </div>
   )
 }
@@ -261,6 +268,9 @@ export default function LeadDetail() {
   const [novaNota, setNovaNota] = useState('')
   const [editandoNota, setEditandoNota] = useState<number | null>(null)
   const [textoEdicao, setTextoEdicao] = useState('')
+  const [vinculoEdicao, setVinculoEdicao] = useState('')
+  const [vinculoNota, setVinculoNota] = useState<string | null>(null)
+  const notaInputRef = useRef<HTMLInputElement>(null)
   const [confirmRemoverNota, setConfirmRemoverNota] = useState<number | null>(null)
   const [linkDrive, setLinkDrive] = useState('')
   const [savingLinkDrive, setSavingLinkDrive] = useState(false)
@@ -462,20 +472,31 @@ export default function LeadDetail() {
     setTimeout(() => setFichaSaved(false), 2000)
   }
 
-  // Anotações: uma linha por anotação no campo de texto existente, no formato
-  // "data_iso|texto". Linhas antigas, sem data, continuam válidas.
-  const notas: Nota[] = anotacoes
-    .split('\n')
-    .map(l => l.trim())
-    .filter(Boolean)
-    .map(linha => {
-      const m = linha.match(/^(\d{4}-\d{2}-\d{2}T\S+?)\|(.*)$/)
-      return m ? { data: m[1], texto: m[2] } : { data: null, texto: linha }
-    })
+  // Anotações (formato em src/lib/anotacoes.ts): cada uma pode ser vinculada a uma consulta.
+  const notas: Nota[] = parseNotas(anotacoes)
+
+  // Vínculo sugerido: a consulta (agendada ou realizada) mais próxima de agora, que é
+  // quando a secretaria costuma anotar. A escolha manual, no seletor, tem prioridade.
+  const consultaSugeridaId = [...consultas]
+    .filter(c => c.status === 'agendada' || c.status === 'realizada')
+    .sort((a, b) => Math.abs(new Date(a.data_consulta).getTime() - Date.now()) - Math.abs(new Date(b.data_consulta).getTime() - Date.now()))[0]?.id ?? ''
+  const vinculoEfetivo = vinculoNota !== null && (vinculoNota === '' || consultas.some(c => c.id === vinculoNota))
+    ? vinculoNota
+    : consultaSugeridaId
+  const consultaPorId = new Map(consultas.map(c => [c.id, c]))
+  const gruposNotas = agruparNotas(notas, consultas.map(c => c.id))
+  const notasDaConsulta = (consultaId: string) => notas.filter(n => n.consultaId === consultaId).length
+  const rotuloConsulta = (c: Consulta) => `${fmtDateTime(c.data_consulta)} · ${c.procedimento}`
+
+  const irParaAnotacoes = (consultaId: string) => {
+    setVinculoNota(consultaId)
+    document.getElementById('anotacoes')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    setTimeout(() => notaInputRef.current?.focus(), 350)
+  }
 
   const persistNotas = async (lista: Nota[]) => {
     if (!id) return false
-    const texto = lista.map(n => (n.data ? `${n.data}|${n.texto}` : n.texto)).join('\n')
+    const texto = serializeNotas(lista)
     setSavingNotes(true)
     const { error } = await supabase.from('leads_clinica').update({ anotacoes: texto }).eq('id', id).eq('clinica_id', clinicaId)
     setSavingNotes(false)
@@ -487,14 +508,15 @@ export default function LeadDetail() {
   const adicionarNota = async () => {
     const texto = novaNota.trim()
     if (!texto) return
-    if (await persistNotas([...notas, { data: new Date().toISOString(), texto }])) setNovaNota('')
+    if (await persistNotas([...notas, { data: new Date().toISOString(), texto, consultaId: vinculoEfetivo || null }])) setNovaNota('')
   }
 
   const salvarEdicaoNota = async () => {
     if (editandoNota === null) return
     const texto = textoEdicao.trim()
     if (!texto) return
-    const lista = notas.map((n, i) => (i === editandoNota ? { ...n, texto } : n))
+    // Nota antiga sem data não carrega vínculo (o formato exige a data).
+    const lista = notas.map((n, i) => (i === editandoNota ? { ...n, texto, consultaId: n.data ? (vinculoEdicao || null) : null } : n))
     if (await persistNotas(lista)) setEditandoNota(null)
   }
 
@@ -548,6 +570,9 @@ export default function LeadDetail() {
   const proximaAgendada = consultas
     .filter(c => c.status === 'agendada' && new Date(c.data_consulta).getTime() >= agora)
     .sort((a, b) => new Date(a.data_consulta).getTime() - new Date(b.data_consulta).getTime())[0] ?? null
+  const qtdAgendadas = consultas.filter(c => c.status === 'agendada').length
+  const qtdRealizadas = consultas.filter(c => c.status === 'realizada').length
+  const abrirNovaConsulta = () => { setNovaConsultaInitial(undefined); setShowNovaConsulta(true) }
   const totalPago = consultas
     .filter(c => c.status === 'realizada')
     .reduce((soma, c) => soma + (c.valor_pago ?? 0), 0)
@@ -731,36 +756,39 @@ export default function LeadDetail() {
 
 
             {/* Histórico de Consultas */}
-            <Section title="Histórico de Consultas" icon={CalendarDays}>
-              <div className="flex items-center justify-between mb-4">
-                <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-text-secondary">
-                  <span>{consultas.length} consulta{consultas.length !== 1 ? 's' : ''} registrada{consultas.length !== 1 ? 's' : ''}</span>
-                  <span>
-                    Próxima: <strong className="text-text-primary">
-                      {proximaAgendada ? fmtDateTime(proximaAgendada.data_consulta) : 'nenhuma agendada'}
-                    </strong>
-                  </span>
-                  <span>
-                    Total pago: <strong className="text-text-primary">{fmtBRL(totalPago)}</strong>
-                  </span>
+            <Section title="Consultas" icon={CalendarDays}>
+              <div className="mb-5 flex flex-col gap-4 lg:flex-row lg:items-stretch">
+                <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-4">
+                  <ResumoItem label="Agendadas" value={qtdAgendadas} tone={qtdAgendadas > 0 ? 'accent' : undefined} />
+                  <ResumoItem label="Realizadas" value={qtdRealizadas} tone={qtdRealizadas > 0 ? 'success' : undefined} />
+                  <ResumoItem label="Próxima" value={
+                    <span className="text-base">{proximaAgendada ? fmtDateTime(proximaAgendada.data_consulta) : 'Nenhuma'}</span>
+                  } />
+                  <ResumoItem label="Total pago" value={<span className="text-base">{fmtBRL(totalPago)}</span>} />
                 </div>
-                <button onClick={() => { setNovaConsultaInitial(undefined); setShowNovaConsulta(true) }}
-                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-light text-accent text-xs font-semibold hover:bg-accent hover:text-white transition-all">
-                  <PlusCircle size={12} /> Nova Consulta
+                <button onClick={abrirNovaConsulta}
+                  className="flex items-center justify-center gap-2.5 rounded-xl bg-accent px-7 py-4 text-base font-bold text-white
+                             shadow-lg shadow-accent/30 transition-all hover:-translate-y-0.5 hover:bg-accent-dark hover:shadow-xl
+                             focus-visible:outline-none focus-visible:ring-4 focus-visible:ring-accent/30 lg:min-w-[220px]">
+                  <PlusCircle size={22} /> Nova Consulta
                 </button>
               </div>
 
               {consultas.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-10 gap-2 text-text-secondary">
-                  <Inbox size={28} className="text-accent-medium" />
-                  <p className="text-sm">Nenhuma consulta registrada</p>
+                <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-dashed border-border py-12 text-text-secondary">
+                  <Inbox size={30} className="text-accent-medium" />
+                  <p className="text-sm">Nenhuma consulta registrada para este paciente</p>
+                  <button onClick={abrirNovaConsulta}
+                    className="mt-1 flex items-center gap-2 rounded-xl bg-accent px-6 py-3 text-sm font-bold text-white shadow-md shadow-accent/30 transition-all hover:bg-accent-dark">
+                    <PlusCircle size={18} /> Agendar primeira consulta
+                  </button>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
                     <thead>
                       <tr className="border-b border-border">
-                        {['Procedimento', 'Data', 'Status', 'Valor Pago', 'Observações'].map(h => (
+                        {['Procedimento', 'Data', 'Status', 'Valor Pago', 'Observações', 'Anotações'].map(h => (
                           <th key={h} className="text-left text-[11px] font-semibold text-text-secondary uppercase tracking-wide pb-2.5 pr-4">{h}</th>
                         ))}
                         <th className="pb-2.5" />
@@ -770,6 +798,7 @@ export default function LeadDetail() {
                       {consultas.map(c => {
                         const cb = CONSULTA_STATUS_COLORS[c.status] ?? DEFAULT_STATUS_COLOR
                         const cbLabel = CONSULTA_LABELS[c.status] ?? c.status
+                        const qtdNotas = notasDaConsulta(c.id)
                         return (
                           <tr key={c.id} className="border-b border-border-subtle last:border-0 hover:bg-surface-hover transition-colors">
                             <td className="py-3 pr-4 font-medium text-text-primary">{c.procedimento}</td>
@@ -781,6 +810,14 @@ export default function LeadDetail() {
                             </td>
                             <td className="py-3 pr-4 text-xs text-text-primary">{fmtBRL(c.valor_pago)}</td>
                             <td className="py-3 pr-4 text-xs text-text-secondary max-w-[160px] truncate">{c.observacoes ?? '—'}</td>
+                            <td className="py-3 pr-4">
+                              <button type="button" onClick={() => irParaAnotacoes(c.id)}
+                                title={qtdNotas ? 'Ver e adicionar anotações desta consulta' : 'Anotar nesta consulta'}
+                                className="inline-flex items-center gap-1.5 rounded-lg px-2 py-1 text-xs font-semibold text-text-secondary transition-colors hover:bg-page hover:text-accent">
+                                <NotebookPen size={13} />
+                                {qtdNotas ? `${qtdNotas}` : 'Anotar'}
+                              </button>
+                            </td>
                             <td className="py-3">
                               {confirmDeleteConsultaId === c.id ? (
                                 <div className="flex items-center gap-1 whitespace-nowrap">
@@ -816,83 +853,142 @@ export default function LeadDetail() {
               )}
             </Section>
 
-            {/* Anotações */}
+            {/* Anotações, agrupadas pela consulta a que pertencem */}
+            <div id="anotacoes" className="scroll-mt-6">
             <Section title="Anotações" icon={NotebookPen}>
-              <input
-                value={novaNota}
-                onChange={e => setNovaNota(e.target.value)}
-                onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); adicionarNota() } }}
-                disabled={savingNotes}
-                placeholder="Escreva uma anotação e pressione Enter"
-                className="w-full border border-border rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-secondary bg-card
-                           outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all disabled:opacity-60"
-              />
-
-              {notas.length > 0 && (
-                <ul className="mt-4 divide-y divide-border">
-                  {[...notas.entries()].reverse().map(([i, nota]) => (
-                    <li key={`${i}-${nota.data ?? ''}-${nota.texto}`} className="py-3 first:pt-0 last:pb-0">
-                      {editandoNota === i ? (
-                        <div className="flex items-center gap-2">
-                          <input
-                            autoFocus
-                            value={textoEdicao}
-                            onChange={e => setTextoEdicao(e.target.value)}
-                            onKeyDown={e => {
-                              if (e.key === 'Enter') { e.preventDefault(); salvarEdicaoNota() }
-                              if (e.key === 'Escape') setEditandoNota(null)
-                            }}
-                            aria-label="Editar anotação"
-                            className="flex-1 border border-accent rounded-lg px-3 py-2 text-sm text-text-primary bg-card outline-none ring-2 ring-accent/10"
-                          />
-                          <button type="button" onClick={() => setEditandoNota(null)}
-                            className="px-2 py-1.5 text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors">
-                            Cancelar
-                          </button>
-                        </div>
-                      ) : (
-                        <div className="flex items-start gap-4">
-                          {nota.data ? (
-                            <time dateTime={nota.data}
-                              className="flex w-16 flex-shrink-0 flex-col items-center rounded-xl border border-border bg-page px-2 py-1.5 text-center leading-tight">
-                              <span className="text-sm font-semibold text-text-primary tabular-nums">
-                                {new Date(nota.data).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' })}
-                              </span>
-                              <span className="mt-0.5 text-[11px] text-text-secondary tabular-nums">
-                                {new Date(nota.data).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}
-                              </span>
-                            </time>
-                          ) : (
-                            <span className="flex w-16 flex-shrink-0 flex-col items-center rounded-xl border border-dashed border-border px-2 py-1.5 text-center text-[11px] leading-tight text-text-secondary">
-                              Sem data
-                            </span>
-                          )}
-                          <p className="flex-1 text-sm leading-relaxed text-text-primary break-words">{nota.texto}</p>
-                          <div className="flex items-center gap-1 flex-shrink-0">
-                            <button type="button" aria-label="Editar anotação"
-                              onClick={() => { setEditandoNota(i); setTextoEdicao(nota.texto); setConfirmRemoverNota(null) }}
-                              className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-page transition-colors">
-                              <Pencil size={13} />
-                            </button>
-                            {confirmRemoverNota === i ? (
-                              <button type="button" onClick={() => removerNota(i)} disabled={savingNotes}
-                                className="px-2 py-1 rounded-md text-xs font-semibold text-status-danger bg-status-danger-light hover:opacity-90 transition-opacity disabled:opacity-60">
-                                Excluir
-                              </button>
-                            ) : (
-                              <button type="button" aria-label="Excluir anotação" onClick={() => setConfirmRemoverNota(i)}
-                                className="p-1.5 rounded-md text-text-secondary hover:text-status-danger hover:bg-status-danger-light transition-colors">
-                                <Trash2 size={13} />
-                              </button>
-                            )}
-                          </div>
-                        </div>
-                      )}
-                    </li>
+              <div className="flex flex-col gap-2 lg:flex-row">
+                <select
+                  aria-label="Vincular a uma consulta"
+                  value={vinculoEfetivo}
+                  onChange={e => setVinculoNota(e.target.value)}
+                  disabled={savingNotes}
+                  className="w-full lg:w-80 flex-shrink-0 border border-border rounded-xl px-3 py-2.5 text-sm text-text-primary bg-card
+                             outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all disabled:opacity-60"
+                >
+                  <option value="">Anotação geral (sem consulta)</option>
+                  {consultas.map(c => (
+                    <option key={c.id} value={c.id}>{rotuloConsulta(c)} ({CONSULTA_LABELS[c.status] ?? c.status})</option>
                   ))}
-                </ul>
+                </select>
+                <input
+                  ref={notaInputRef}
+                  value={novaNota}
+                  onChange={e => setNovaNota(e.target.value)}
+                  onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); adicionarNota() } }}
+                  disabled={savingNotes}
+                  placeholder="Escreva uma anotação e pressione Enter"
+                  className="w-full flex-1 border border-border rounded-xl px-4 py-2.5 text-sm text-text-primary placeholder:text-text-secondary bg-card
+                             outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all disabled:opacity-60"
+                />
+              </div>
+
+              {notas.length === 0 && (
+                <p className="mt-4 text-xs text-text-secondary">Nenhuma anotação ainda. Escolha a consulta acima para registrar o que aconteceu naquele atendimento.</p>
               )}
+
+              <div className="mt-4 space-y-5">
+                {gruposNotas.map(grupo => {
+                  const consulta = grupo.consultaId ? consultaPorId.get(grupo.consultaId) : null
+                  const cb = consulta ? (CONSULTA_STATUS_COLORS[consulta.status] ?? DEFAULT_STATUS_COLOR) : null
+                  return (
+                    <div key={grupo.consultaId ?? 'geral'}>
+                      <div className="mb-2 flex flex-wrap items-center gap-2 text-xs">
+                        {consulta && cb ? (
+                          <>
+                            <CalendarDays size={13} className="text-accent" />
+                            <span className="font-semibold text-text-primary">{consulta.procedimento}</span>
+                            <span className="text-text-secondary">{fmtDateTime(consulta.data_consulta)}</span>
+                            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${cb.badgeBg} ${cb.badgeText}`}>
+                              {CONSULTA_LABELS[consulta.status] ?? consulta.status}
+                            </span>
+                          </>
+                        ) : (
+                          <span className="font-semibold text-text-secondary uppercase tracking-wide">Anotações gerais</span>
+                        )}
+                      </div>
+                      <ul className={`divide-y divide-border rounded-xl border border-border-subtle px-4 ${consulta ? 'border-l-2 border-l-accent' : ''}`}>
+                        {grupo.itens.map(({ indice: i, nota }) => (
+                          <li key={`${i}-${nota.data ?? ''}-${nota.texto}`} className="py-3">
+                            {editandoNota === i ? (
+                              <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
+                                {nota.data && (
+                                  <select
+                                    aria-label="Consulta da anotação"
+                                    value={vinculoEdicao}
+                                    onChange={e => setVinculoEdicao(e.target.value)}
+                                    className="sm:w-64 border border-border rounded-lg px-2 py-2 text-xs text-text-primary bg-card outline-none focus:border-accent"
+                                  >
+                                    <option value="">Anotação geral</option>
+                                    {consultas.map(c => <option key={c.id} value={c.id}>{rotuloConsulta(c)}</option>)}
+                                  </select>
+                                )}
+                                <input
+                                  autoFocus
+                                  value={textoEdicao}
+                                  onChange={e => setTextoEdicao(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') { e.preventDefault(); salvarEdicaoNota() }
+                                    if (e.key === 'Escape') setEditandoNota(null)
+                                  }}
+                                  aria-label="Editar anotação"
+                                  className="flex-1 border border-accent rounded-lg px-3 py-2 text-sm text-text-primary bg-card outline-none ring-2 ring-accent/10"
+                                />
+                                <button type="button" onClick={salvarEdicaoNota} disabled={savingNotes}
+                                  className="px-2 py-1.5 text-xs font-semibold text-accent hover:underline disabled:opacity-60">
+                                  Salvar
+                                </button>
+                                <button type="button" onClick={() => setEditandoNota(null)}
+                                  className="px-2 py-1.5 text-xs font-semibold text-text-secondary hover:text-text-primary transition-colors">
+                                  Cancelar
+                                </button>
+                              </div>
+                            ) : (
+                              <div className="flex items-start gap-4">
+                                {nota.data ? (
+                                  <time dateTime={nota.data}
+                                    className="flex w-16 flex-shrink-0 flex-col items-center rounded-xl border border-border bg-page px-2 py-1.5 text-center leading-tight">
+                                    <span className="text-sm font-semibold text-text-primary tabular-nums">
+                                      {new Date(nota.data).toLocaleDateString('pt-BR', { timeZone: 'America/Sao_Paulo', day: '2-digit', month: '2-digit' })}
+                                    </span>
+                                    <span className="mt-0.5 text-[11px] text-text-secondary tabular-nums">
+                                      {new Date(nota.data).toLocaleTimeString('pt-BR', { timeZone: 'America/Sao_Paulo', hour: '2-digit', minute: '2-digit' })}
+                                    </span>
+                                  </time>
+                                ) : (
+                                  <span className="flex w-16 flex-shrink-0 flex-col items-center rounded-xl border border-dashed border-border px-2 py-1.5 text-center text-[11px] leading-tight text-text-secondary">
+                                    Sem data
+                                  </span>
+                                )}
+                                <p className="flex-1 text-sm leading-relaxed text-text-primary break-words">{nota.texto}</p>
+                                <div className="flex items-center gap-1 flex-shrink-0">
+                                  <button type="button" aria-label="Editar anotação"
+                                    onClick={() => { setEditandoNota(i); setTextoEdicao(nota.texto); setVinculoEdicao(nota.consultaId ?? ''); setConfirmRemoverNota(null) }}
+                                    className="p-1.5 rounded-md text-text-secondary hover:text-text-primary hover:bg-page transition-colors">
+                                    <Pencil size={13} />
+                                  </button>
+                                  {confirmRemoverNota === i ? (
+                                    <button type="button" onClick={() => removerNota(i)} disabled={savingNotes}
+                                      className="px-2 py-1 rounded-md text-xs font-semibold text-status-danger bg-status-danger-light hover:opacity-90 transition-opacity disabled:opacity-60">
+                                      Excluir
+                                    </button>
+                                  ) : (
+                                    <button type="button" aria-label="Excluir anotação" onClick={() => setConfirmRemoverNota(i)}
+                                      className="p-1.5 rounded-md text-text-secondary hover:text-status-danger hover:bg-status-danger-light transition-colors">
+                                      <Trash2 size={13} />
+                                    </button>
+                                  )}
+                                </div>
+                              </div>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  )
+                })}
+              </div>
             </Section>
+            </div>
 
             {/* Link do Drive */}
             <Section title="Link do Drive" icon={LinkIcon}>
