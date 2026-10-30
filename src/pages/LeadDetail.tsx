@@ -10,6 +10,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { STATUS_COLORS, DEFAULT_STATUS_COLOR, CONSULTA_STATUS_COLORS } from '../lib/statusColors'
 import { useFunil } from '../hooks/useFunil'
+import { ehOrcamento } from '../lib/funil'
 import { fmtDateTime, fmtBRL } from '../lib/format'
 import {
   hasConsultaRealizada, BLOQUEIO_SEM_CONSULTA_MSG,
@@ -82,7 +83,7 @@ function toDatetimeLocalSafe(iso: string | null) {
   return iso ? toDatetimeLocal(iso) : ''
 }
 function classificacaoAtrasada(lead: Lead): boolean {
-  if (lead.status !== 'orcamento_pendente' || lead.em_tratamento || !lead.data_virou_recorrente) return false
+  if (!ehOrcamento(lead.status) || lead.em_tratamento || !lead.data_virou_recorrente) return false
   const horas = (Date.now() - new Date(lead.data_virou_recorrente).getTime()) / (1000 * 60 * 60)
   return horas >= 24
 }
@@ -247,7 +248,7 @@ export default function LeadDetail() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { clinicaId, loading: authLoading } = useAuth()
-  const { visiveis, labels, exigeConsulta, statusExibido } = useFunil()
+  const { visiveis, ocultas, labels, exigeConsulta, statusExibido } = useFunil()
   const statusOptions = visiveis.map(e => ({ value: e.chave, label: e.rotulo }))
   const [lead, setLead] = useState<Lead | null>(null)
   const [consultas, setConsultas] = useState<Consulta[]>([])
@@ -283,6 +284,9 @@ export default function LeadDetail() {
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null)
 
   // Etapa em que o lead aparece: uma etapa dobrada mostra a coluna de destino.
+  // Ref evita refazer o fetch e o canal Realtime quando o funil é recarregado.
+  const statusExibidoRef = useRef(statusExibido)
+  statusExibidoRef.current = statusExibido
   const etapaExibida = (status: string) => statusExibido[status] ?? status
 
   const syncFicha = (data: Lead) => {
@@ -298,14 +302,14 @@ export default function LeadDetail() {
     if (error) setToastMsg('Não foi possível carregar o lead. Tente recarregar a página.')
     if (data) {
       setLead(data as Lead)
-      setStatusValue(etapaExibida(data.status))
+      setStatusValue(statusExibidoRef.current[data.status] ?? data.status)
       setAnotacoes(data.anotacoes ?? '')
       setLinkDrive(data.link_drive ?? '')
       syncFicha(data as Lead)
     }
     setLoading(false)
     return data
-  }, [id, clinicaId, statusExibido])
+  }, [id, clinicaId])
 
   const fetchConsultas = useCallback(async () => {
     if (!id) return
@@ -330,12 +334,11 @@ export default function LeadDetail() {
         .channel(`lead_detail_${id}`)
         .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'leads_clinica', filter: `id=eq.${id}` },
           (payload) => {
+            // Mescla em vez de substituir: o payload pode omitir colunas grandes.
+            // Notas, link e ficha ficam como a secretária os está editando.
             const updated = payload.new as Lead
-            setLead(updated)
-            setStatusValue(etapaExibida(updated.status))
-            setAnotacoes(updated.anotacoes ?? '')
-            setLinkDrive(updated.link_drive ?? '')
-            syncFicha(updated)
+            setLead(prev => prev ? { ...prev, ...updated } : (updated as Lead))
+            setStatusValue(statusExibidoRef.current[updated.status] ?? updated.status)
           })
         .subscribe()
 
@@ -350,11 +353,13 @@ export default function LeadDetail() {
   }, [id, clinicaId, authLoading, fetchLead, fetchConsultas])
 
   // Recebe a etapa escolhida; o seletor do cabeçalho salva ao trocar a opção.
-  const saveStatus = async (valor: string) => {
+  // `normalizar` grava a chave da coluna exibida quando o lead está numa etapa dobrada
+  // (ex.: "Aguardando Confirmação" → "Confirmado"); sem isso o seletor não dispara.
+  const saveStatus = async (valor: string, normalizar = false) => {
     if (!id || !lead) return
     const exibida = etapaExibida(lead.status)
     // Já está nesta etapa (inclusive quando a chave gravada é uma etapa dobrada).
-    if (valor === exibida) return
+    if (valor === exibida && !(normalizar && lead.status !== valor)) return
 
     if (!lead.atendimento_manual) {
       if (exigeConsulta.has(valor) && !exigeConsulta.has(lead.status)) {
@@ -533,7 +538,8 @@ export default function LeadDetail() {
     </div>
   )
 
-  const badgeColor = STATUS_COLORS[lead.status] ?? DEFAULT_STATUS_COLOR
+  const badgeColor = STATUS_COLORS[etapaExibida(lead.status)] ?? DEFAULT_STATUS_COLOR
+  const etapaReal = statusExibido[lead.status] ? ocultas.find(e => e.chave === lead.status)?.rotulo ?? null : null
   const badgeLabel = labels[lead.status] ?? lead.status
   const horasParadas = horasParado(lead)
 
@@ -576,7 +582,7 @@ export default function LeadDetail() {
               <ArrowLeft size={14} /> Voltar para o CRM
             </button>
             <div className="flex items-center gap-2">
-              {(lead.status === 'orcamento_pendente' || lead.status === 'paciente_recorrente') && (
+              {(ehOrcamento(lead.status) || lead.status === 'paciente_recorrente') && (
                 <button onClick={toggleEmTratamento} disabled={togglingEmTratamento}
                   title={lead.em_tratamento ? 'Encerrar tratamento e classificar o retorno' : 'Marcar como em tratamento contínuo'}
                   className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-xs font-semibold transition-all disabled:opacity-50
@@ -686,6 +692,16 @@ export default function LeadDetail() {
                       )
                     })}
                   </select>
+                  {etapaReal && (
+                    <span className="text-[11px] text-text-secondary">
+                      Etapa real: <strong>{etapaReal}</strong> ·{' '}
+                      <button type="button" disabled={savingStatus}
+                        onClick={() => saveStatus(etapaExibida(lead.status), true)}
+                        className="text-accent hover:underline disabled:opacity-50">
+                        mover para {labels[lead.status]}
+                      </button>
+                    </span>
+                  )}
                 </label>
 
                 <div className="grid grid-cols-2 gap-4">
@@ -909,7 +925,7 @@ export default function LeadDetail() {
             </Section>
 
             {/* Classificar Retorno */}
-            {lead.status === 'orcamento_pendente' && (
+            {ehOrcamento(lead.status) && (
               <Section title="Classificar Retorno" icon={CalendarDays}>
                 {classificacaoAtrasada(lead) && (
                   <p className="flex items-center gap-1.5 text-xs font-semibold text-status-danger bg-status-danger-light rounded-lg px-3 py-2 mb-3">

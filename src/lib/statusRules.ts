@@ -52,6 +52,8 @@ export const LIMITE_PARADO_HORAS = 48
 export const ETAPAS_ALERTA_PARADO = new Set([
   'iniciou_conversa',
   'conversando',
+  'follow_up_1_feito',
+  'follow_up_2_feito',
   'follow_up_3_feito',
   'consulta_cancelada',
 ])

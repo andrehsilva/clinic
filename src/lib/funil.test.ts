@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { aplicarLayoutSimplificado, etapasPadrao, resolverFunil, type Etapa } from './funil'
+import { aplicarLayoutSimplificado, ehOrcamento, etapasPadrao, resolverFunil, type Etapa } from './funil'
 import { ETAPAS_AUTOMATICAS } from './statusRules'
 
 /** Aplica um patch a uma etapa do funil padrão e devolve a lista resolvida. */
@@ -93,5 +93,14 @@ describe('aplicarLayoutSimplificado', () => {
       .toEqual(originais.map(e => [e.chave, e.exige_consulta_realizada, e.e_paciente]))
     expect(f.exigeConsulta.has('paciente_recorrente')).toBe(true)
     expect(f.pacienteKeys).toContain('paciente_recorrente')
+  })
+})
+
+describe('ehOrcamento', () => {
+  it('cobre orçamento pendente e consulta realizada, não as demais etapas', () => {
+    expect(ehOrcamento('orcamento_pendente')).toBe(true)
+    expect(ehOrcamento('consulta_realizada')).toBe(true)
+    expect(ehOrcamento('retornar_3_meses')).toBe(false)
+    expect(ehOrcamento('conversando')).toBe(false)
   })
 })

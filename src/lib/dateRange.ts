@@ -8,7 +8,23 @@ export function toSP(d: Date) {
 
 export function nowSP() { return toSP(new Date()) }
 
-export function fmt(d: Date) { return d.toISOString().split('T')[0] }
+// Formata os componentes locais do Date. Os Dates de nowSP()/toSP() carregam o relógio de
+// São Paulo como se fosse local, então toISOString() (UTC) viraria "amanhã" após 21h.
+export function fmt(d: Date) {
+  const mm = String(d.getMonth() + 1).padStart(2, '0')
+  const dd = String(d.getDate()).padStart(2, '0')
+  return `${d.getFullYear()}-${mm}-${dd}`
+}
+
+/** Dia (YYYY-MM-DD) de um timestamp ISO no fuso de São Paulo. */
+export function diaSP(iso: string) {
+  return new Date(iso).toLocaleDateString('en-CA', { timeZone: 'America/Sao_Paulo' })
+}
+
+/** Dia da semana (0 = domingo) de um timestamp ISO no fuso de São Paulo. */
+export function diaSemanaSP(iso: string) {
+  return toSP(new Date(iso)).getDay()
+}
 
 export function getRange(period: Period, custom: { from: string; to: string }): DateRange {
   const now = nowSP()

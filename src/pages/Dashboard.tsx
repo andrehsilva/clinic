@@ -11,10 +11,11 @@ import { useAuth } from '../contexts/AuthContext'
 import { useTheme } from '../contexts/ThemeContext'
 import { STATUS_COLORS, DEFAULT_STATUS_COLOR } from '../lib/statusColors'
 import { useFunil } from '../hooks/useFunil'
+import { STATUS_ORCAMENTO } from '../lib/funil'
 import AniversariantesCard from '../components/AniversariantesCard'
 import ProximasConsultasCard from '../components/ProximasConsultasCard'
 import { Toast } from '../components/Toast'
-import { type Period, nowSP, toSP, fmt, getRange, PERIODS } from '../lib/dateRange'
+import { type Period, nowSP, toSP, fmt, diaSP, diaSemanaSP, getRange, PERIODS } from '../lib/dateRange'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface Lead { created_at: string; inicio_atendimento: string | null; data_marcacao_agendamento: string | null }
@@ -103,7 +104,7 @@ function KpiCard({ icon: Icon, label, value, desc, tone = 'accent', suffix = '',
 // ─── Main Dashboard ───────────────────────────────────────────────────────────
 export default function Dashboard() {
   const { profile, clinicaId, loading: authLoading } = useAuth()
-  const { labels } = useFunil()
+  const { labels, statusExibido } = useFunil()
   const { theme } = useTheme()
   const chartColors = CHART_COLORS[theme]
   const [period, setPeriod] = useState<Period>('month')
@@ -124,12 +125,22 @@ export default function Dashboard() {
     setLoading(true)
     let hadError = false
 
-    const { data: leadsData, error: leadsError } = await supabase
-      .from('leads_clinica')
-      .select('created_at, inicio_atendimento, data_marcacao_agendamento')
-      .eq('clinica_id', clinicaId)
-    if (leadsError) hadError = true
-    setLeads((leadsData ?? []) as Lead[])
+    // O PostgREST corta cada resposta em 1000 linhas: busca em páginas até esgotar.
+    const PAGE = 1000
+    const todos: Lead[] = []
+    for (let from = 0; ; from += PAGE) {
+      const { data: pagina, error: leadsError } = await supabase
+        .from('leads_clinica')
+        .select('created_at, inicio_atendimento, data_marcacao_agendamento')
+        .eq('clinica_id', clinicaId)
+        .order('created_at', { ascending: false })
+        .order('id')
+        .range(from, from + PAGE - 1)
+      if (leadsError) { hadError = true; break }
+      todos.push(...(pagina as Lead[]))
+      if (!pagina || pagina.length < PAGE) break
+    }
+    setLeads(todos)
 
     const { data: hor, error: horError } = await supabase.from('horario_comercial').select('*').eq('clinica_id', clinicaId)
     if (horError) hadError = true
@@ -150,7 +161,7 @@ export default function Dashboard() {
       .from('leads_clinica')
       .select('id, nome_lead, whatsapp_lead, data_virou_recorrente')
       .eq('clinica_id', clinicaId)
-      .eq('status', 'orcamento_pendente')
+      .in('status', [...STATUS_ORCAMENTO])
       .eq('em_tratamento', false)
       .order('data_virou_recorrente', { ascending: true })
       .limit(10)
@@ -166,7 +177,7 @@ export default function Dashboard() {
   // ── KPIs ──
   const inRange = (d: string | null) => {
     if (!d) return false
-    const s = d.split('T')[0]
+    const s = diaSP(d)
     return s >= range.from && s <= range.to
   }
 
@@ -179,15 +190,25 @@ export default function Dashboard() {
   if (range.from && range.to) {
     const cur = new Date(range.from + 'T00:00:00')
     const end = new Date(range.to + 'T00:00:00')
-    while (cur <= end && days.length < 60) {
+    while (cur <= end && days.length < 400) {
       days.push(fmt(cur))
       cur.setDate(cur.getDate() + 1)
     }
   }
+  const contarPorDia = (campo: 'inicio_atendimento' | 'data_marcacao_agendamento') => {
+    const mapa = new Map<string, number>()
+    for (const l of leads) {
+      const v = l[campo]
+      if (v) { const d = diaSP(v); mapa.set(d, (mapa.get(d) ?? 0) + 1) }
+    }
+    return mapa
+  }
+  const atendPorDia = contarPorDia('inicio_atendimento')
+  const agendPorDia = contarPorDia('data_marcacao_agendamento')
   const lineData = days.map(d => ({
     date: fmtChartAxisDate(d),
-    Atendimentos: leads.filter(l => l.inicio_atendimento?.split('T')[0] === d).length,
-    Agendamentos: leads.filter(l => l.data_marcacao_agendamento?.split('T')[0] === d).length,
+    Atendimentos: atendPorDia.get(d) ?? 0,
+    Agendamentos: agendPorDia.get(d) ?? 0,
   }))
 
   // ── Bar Chart: dia da semana ──
@@ -195,7 +216,7 @@ export default function Dashboard() {
     dia: dayLabel(i),
     total: leads.filter(l => {
       if (!l.inicio_atendimento || !inRange(l.inicio_atendimento)) return false
-      return new Date(l.inicio_atendimento).getDay() === i
+      return diaSemanaSP(l.inicio_atendimento) === i
     }).length,
   }))
   const maxWeek = Math.max(...weekCounts.map(w => w.total), 1)
@@ -374,7 +395,7 @@ export default function Dashboard() {
                 </thead>
                 <tbody>
                   {upcoming.map((row, i) => {
-                    const badgeColor = STATUS_COLORS[row.status ?? ''] ?? DEFAULT_STATUS_COLOR
+                    const badgeColor = STATUS_COLORS[statusExibido[row.status ?? ''] ?? row.status ?? ''] ?? DEFAULT_STATUS_COLOR
                     const badgeLabel = labels[row.status ?? ''] ?? row.status
                     const dt = row.data_agendamento ? new Date(row.data_agendamento) : null
                     return (

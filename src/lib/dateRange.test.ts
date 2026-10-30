@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { getRange, fmt, nowSP, PERIODS } from './dateRange'
+import { getRange, fmt, nowSP, diaSP, diaSemanaSP, PERIODS } from './dateRange'
 
 describe('getRange', () => {
   const custom = { from: '2026-01-01', to: '2026-01-15' }
@@ -52,5 +52,22 @@ describe('PERIODS', () => {
     expect(keys).toContain('today')
     expect(keys).toContain('custom')
     expect(keys.length).toBe(9)
+  })
+})
+
+describe('fmt', () => {
+  it('usa os componentes locais, sem virar o dia pelo UTC', () => {
+    expect(fmt(new Date(2026, 9, 30, 23, 30))).toBe('2026-10-30')
+    expect(fmt(new Date(2026, 0, 5, 0, 10))).toBe('2026-01-05')
+  })
+})
+
+describe('diaSP / diaSemanaSP', () => {
+  it('22h em São Paulo ainda é o mesmo dia (01h UTC do dia seguinte)', () => {
+    expect(diaSP('2026-10-31T01:00:00Z')).toBe('2026-10-30')
+  })
+  it('dia da semana segue o fuso de São Paulo', () => {
+    // 2026-10-31T01:00Z = sexta 22h em SP
+    expect(diaSemanaSP('2026-10-31T01:00:00Z')).toBe(5)
   })
 })

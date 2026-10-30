@@ -24,6 +24,7 @@ import {
   ETAPAS_AUTOMATICAS, BLOQUEIO_ETAPA_AUTOMATICA_MSG, horasParado,
 } from '../lib/statusRules'
 import { useFunil } from '../hooks/useFunil'
+import { ehOrcamento } from '../lib/funil'
 import { Toast } from '../components/Toast'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
@@ -61,7 +62,7 @@ function formatTime(minutos: number | null): string {
 }
 
 function classificacaoAtrasada(lead: Lead): boolean {
-  if (lead.status !== 'orcamento_pendente' || lead.em_tratamento || !lead.data_virou_recorrente) return false
+  if (!ehOrcamento(lead.status) || lead.em_tratamento || !lead.data_virou_recorrente) return false
   const horas = (Date.now() - new Date(lead.data_virou_recorrente).getTime()) / (1000 * 60 * 60)
   return horas >= CLASSIFICACAO_ATRASADA_HORAS
 }
@@ -108,8 +109,11 @@ function LeadCard({
   updatingFlags?: Record<string, true>
 }) {
   const navigate = useNavigate()
-  const { labels } = useFunil()
-  const statusColor = STATUS_COLORS[lead.status] ?? DEFAULT_STATUS_COLOR
+  const { labels, ocultas, statusExibido } = useFunil()
+  // Cor segue a coluna onde o lead aparece, igual ao rótulo.
+  const statusColor = STATUS_COLORS[statusExibido[lead.status] ?? lead.status] ?? DEFAULT_STATUS_COLOR
+  // Etapa real quando o lead está numa etapa dobrada (ex.: "Aguardando Confirmação" dentro de "Confirmado").
+  const etapaReal = statusExibido[lead.status] ? ocultas.find(e => e.chave === lead.status)?.rotulo ?? null : null
   const atrasado = classificacaoAtrasada(lead)
   const horasParadas = horasParado(lead)
   const handleClick = () => { if (!overlay) navigate(`/leads/${lead.id}`) }
@@ -133,6 +137,8 @@ function LeadCard({
         <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-semibold ${statusColor.badgeBg} ${statusColor.badgeText}`}>{statusColor.pulse && <span className={`w-1.5 h-1.5 rounded-full pulse-dot flex-shrink-0 ${statusColor.dot}`} />}{labels[lead.status] ?? lead.status}</span>
         <span className="flex items-center gap-0.5 text-[10px] text-text-secondary"><Clock size={9} />{formatTime(lead.minutos_ultima_mensagem)}</span>
       </div>
+      {etapaReal && <span className="inline-block mt-1 mr-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-border-subtle text-text-secondary" title="Etapa real do lead, dobrada nesta coluna">↳ {etapaReal}</span>}
+      {horasParadas !== null && !overlay && <span className="inline-block mt-1 mr-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-danger-light text-status-danger">Parado há {horasParadas}h</span>}
       {lead.data_virou_recorrente && <span className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-purple-light text-status-purple">Paciente ativo</span>}
       {lead.tag_paciente_recorrente && <span className="inline-block mt-1 mr-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-purple-light text-status-purple">Paciente Recorrente</span>}
       {lead.em_tratamento && <span className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-purple-light text-status-purple">Em tratamento</span>}

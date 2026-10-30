@@ -8,7 +8,7 @@ import { supabase } from '../lib/supabase'
 import { useAuth } from '../contexts/AuthContext'
 import { STATUS_COLORS, DEFAULT_STATUS_COLOR } from '../lib/statusColors'
 import { useFunil } from '../hooks/useFunil'
-import { type Period, nowSP, fmt, getRange, PERIODS } from '../lib/dateRange'
+import { type Period, nowSP, fmt, diaSP, getRange, PERIODS } from '../lib/dateRange'
 import { fmtDateTime } from '../lib/format'
 import { Toast } from '../components/Toast'
 
@@ -34,8 +34,8 @@ const PAGE_SIZE = 100
 
 // ─── Status Badge ─────────────────────────────────────────────────────────────
 function StatusBadge({ status }: { status: string }) {
-  const { labels } = useFunil()
-  const c = STATUS_COLORS[status] ?? DEFAULT_STATUS_COLOR
+  const { labels, statusExibido } = useFunil()
+  const c = STATUS_COLORS[statusExibido[status] ?? status] ?? DEFAULT_STATUS_COLOR
   const label = labels[status] ?? status
   return (
     <span
@@ -58,7 +58,12 @@ function exportCSV(leads: Lead[], tab: Tab, labels: Record<string, string>) {
     fmtDateTime(l.inicio_atendimento),
     fmtDateTime(l.data_agendamento),
   ])
-  const csv = [headers, ...rows].map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+  // Células que começam com = + - @ viram fórmula no Excel; o nome vem do WhatsApp, então prefixa com apóstrofo.
+  const celula = (c: unknown) => {
+    const t = String(c)
+    return `"${(/^[=+\-@\t\r]/.test(t) ? `'${t}` : t).replace(/"/g, '""')}"`
+  }
+  const csv = [headers, ...rows].map(r => r.map(celula).join(',')).join('\n')
   const blob = new Blob(['\ufeff' + csv], { type: 'text/csv;charset=utf-8;' })
   const a = document.createElement('a')
   a.href = URL.createObjectURL(blob)
@@ -83,7 +88,7 @@ function exportPDF(leads: Lead[], tab: Tab, labels: Record<string, string>) {
     <tr>
       <td>${escapeHtml(l.nome_lead ?? '—')}<br/><small>${escapeHtml(l.whatsapp_lead ?? '')}</small></td>
       <td>${escapeHtml(l.procedimento_interesse ?? '—')}</td>
-      <td>${labels[l.status] ?? escapeHtml(l.status)}</td>
+      <td>${escapeHtml(labels[l.status] ?? l.status)}</td>
       <td>${fmtDateTime(l.inicio_atendimento)}</td>
       <td>${fmtDateTime(l.data_agendamento)}</td>
     </tr>`).join('')
@@ -136,7 +141,10 @@ function NovoContatoModal({ clinicaId, onClose, onSaved }: { clinicaId: string; 
     const { error } = await supabase.from('leads_clinica').insert({
       nome_lead: form.nome_lead.trim(),
       whatsapp_lead: form.whatsapp_lead.trim(),
-      status: form.tipo === 'paciente' ? 'consulta_realizada' : 'iniciou_conversa',
+      // Paciente manual entra em orçamento pendente, onde dá para classificar o retorno
+      // (consulta_realizada não tem saída no layout enxuto).
+      status: form.tipo === 'paciente' ? 'orcamento_pendente' : 'iniciou_conversa',
+      data_virou_recorrente: form.tipo === 'paciente' ? now : null,
       procedimento_interesse: form.procedimento_interesse.trim() || null,
       data_nascimento: form.data_nascimento || null,
       data_agendamento: form.data_agendamento ? new Date(form.data_agendamento).toISOString() : null,
@@ -344,7 +352,7 @@ export default function Leads() {
     } else {
       // Período filtra só as abas de Contatos/Pacientes, por data de criação
       list = list.filter(l => {
-        const d = l.created_at.split('T')[0]
+        const d = diaSP(l.created_at)
         return d >= range.from && d <= range.to
       })
       list = list.filter(l => !l.arquivado)

@@ -234,6 +234,17 @@ export function resolverFunil(etapas: Etapa[]): FunilResolvido {
   return { visiveis, ocultas, labels, exigeConsulta, pacienteKeys, statusExibido }
 }
 
+/**
+ * Etapas em que o paciente já fez a consulta e aguarda classificação de retorno.
+ * `consulta_realizada` entra aqui porque é onde cai o paciente cadastrado
+ * manualmente e, no layout enxuto, ela é exibida na coluna de orçamento.
+ */
+export const STATUS_ORCAMENTO = ['orcamento_pendente', 'consulta_realizada'] as const
+
+export function ehOrcamento(status: string): boolean {
+  return (STATUS_ORCAMENTO as readonly string[]).includes(status)
+}
+
 export function isNicho(value: unknown): value is Nicho {
   return NICHOS.some(n => n.value === value)
 }
