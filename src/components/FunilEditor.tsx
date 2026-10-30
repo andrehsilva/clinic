@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react'
-import { Save, ChevronDown, ChevronUp } from 'lucide-react'
+import { Save, ChevronDown, ChevronUp, Rows3 } from 'lucide-react'
 import { supabase } from '../lib/supabase'
 import { Toast } from '../components/Toast'
-import { NICHOS, isNicho, type Etapa, type Nicho } from '../lib/funil'
+import { aplicarLayoutSimplificado, GABARITO, NICHOS, isNicho, type Etapa, type Nicho } from '../lib/funil'
 
 const inputCls = 'w-full border border-border rounded-xl px-3 py-2.5 text-sm outline-none focus:border-accent focus:ring-2 focus:ring-accent/10 transition-all bg-card'
 
@@ -27,6 +27,7 @@ export function FunilEditor({ clinicaId, nicho, onSaved }: {
   const [dirty, setDirty] = useState(false)
   const [saving, setSaving] = useState(false)
   const [confirmAplicar, setConfirmAplicar] = useState(false)
+  const [confirmLayout, setConfirmLayout] = useState(false)
   const [toastMsg, setToastMsg] = useState<string | null>(null)
 
   const carregar = async () => {
@@ -67,11 +68,9 @@ export function FunilEditor({ clinicaId, nicho, onSaved }: {
     ))
     setDirty(true)
   }
-
-  const salvar = async () => {
-    if (rows.some(r => !r.rotulo.trim())) { setToastMsg('Todas as etapas precisam de um nome.'); return }
+  const salvarLinhas = async (linhas: Etapa[], mensagem: string) => {
     setSaving(true)
-    const results = await Promise.all(rows.map(r =>
+    const results = await Promise.all(linhas.map(r =>
       supabase.from('funil_etapas').update({
         rotulo: r.rotulo.trim(),
         ordem: r.ordem,
@@ -82,10 +81,24 @@ export function FunilEditor({ clinicaId, nicho, onSaved }: {
     ))
     setSaving(false)
     if (results.some(r => r.error)) { setToastMsg('Não foi possível salvar o funil. Tente novamente.'); return }
+    setRows(linhas)
     setDirty(false)
     onSaved?.(nichoAtual)
-    setToastMsg('Funil salvo.')
+    setToastMsg(mensagem)
   }
+
+  const salvar = async () => {
+    if (rows.some(r => !r.rotulo.trim())) { setToastMsg('Todas as etapas precisam de um nome.'); return }
+    await salvarLinhas(rows, 'Funil salvo.')
+  }
+
+  const aplicarLayout = async () => {
+    setConfirmLayout(false)
+    await salvarLinhas(aplicarLayoutSimplificado(rows), 'Layout simplificado aplicado.')
+  }
+
+  const rotuloOriginal = (chave: string) =>
+    (GABARITO[nichoAtual] as Record<string, string>)[chave] ?? chave
 
   const aplicarNicho = async () => {
     setConfirmAplicar(false)
@@ -113,41 +126,30 @@ export function FunilEditor({ clinicaId, nicho, onSaved }: {
 
   return (
     <div className="space-y-6">
-      <div>
-        <label className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Nicho da clínica</label>
-        <div className="flex gap-2 mt-1.5">
-          <select value={nichoEscolhido} onChange={e => {
-            const valor = e.target.value
-            if (isNicho(valor)) { setNichoEscolhido(valor); setConfirmAplicar(false) }
-          }} className={inputCls}>
-            {NICHOS.map(n => <option key={n.value} value={n.value}>{n.label}</option>)}
-          </select>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border border-border rounded-xl p-4">
+        <div>
+          <p className="text-sm font-semibold text-text-primary">Simplificar colunas</p>
+          <p className="text-xs text-text-secondary mt-1">Junta Reagendado em Em conversa - Reagendamento e reduz outras colunas, sem mudar as chaves que os fluxos do WhatsApp usam.</p>
         </div>
-        {nichoEscolhido !== nichoAtual && !confirmAplicar && (
-          <button type="button" onClick={() => setConfirmAplicar(true)}
-            className="mt-3 text-xs font-semibold text-accent hover:text-accent-dark transition-colors">
-            Aplicar modelo de {nomeNicho}
-          </button>
-        )}
-        {confirmAplicar && (
-          <div className="mt-3 border border-border rounded-xl p-3 space-y-3">
-            <p className="text-xs text-text-secondary">
-              Os nomes e a ordem personalizados das etapas serão substituídos pelo modelo de {nomeNicho}. Continuar?
-            </p>
-            <div className="flex gap-2 justify-end">
-              <button type="button" onClick={() => setConfirmAplicar(false)}
-                className="px-3 py-1.5 rounded-lg text-xs font-semibold text-text-secondary hover:text-text-primary">Cancelar</button>
-              <button type="button" onClick={aplicarNicho} disabled={saving}
-                className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent-dark disabled:opacity-60">Aplicar</button>
-            </div>
-          </div>
-        )}
+        <button type="button" onClick={() => setConfirmLayout(true)} disabled={saving}
+          className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent-dark disabled:opacity-60">
+          <Rows3 size={14} /> Aplicar layout enxuto
+        </button>
       </div>
+      {confirmLayout && (
+        <div className="border border-border rounded-xl p-4 space-y-3">
+          <p className="text-sm text-text-primary">Reagendado passa a aparecer em Em conversa - Reagendamento. Retorno continua separado para o fluxo agendado; ao chegar a data, mantenha a automação que muda o status para conversando. O layout substitui as dobras atuais, mas mantém as chaves e regras.</p>
+          <div className="flex justify-end gap-2">
+            <button type="button" onClick={() => setConfirmLayout(false)} className="px-3 py-1.5 rounded-lg text-xs font-semibold text-text-secondary hover:text-text-primary">Cancelar</button>
+            <button type="button" onClick={aplicarLayout} disabled={saving} className="px-3 py-1.5 rounded-lg bg-accent text-white text-xs font-semibold hover:bg-accent-dark disabled:opacity-60">Confirmar</button>
+          </div>
+        </div>
+      )}
 
       <div>
         <p className="text-xs font-semibold text-text-secondary uppercase tracking-wide">Etapas do funil</p>
         <p className="text-[11px] text-text-secondary mt-1 mb-3">
-          Nome, ordem e regras são editáveis. As chaves técnicas não mudam, então a entrada pelo WhatsApp continua funcionando.
+          O nome original identifica o fluxo; o nome editável é o que aparece para a equipe.
         </p>
         <div className="space-y-2">
           {ordenadas.map((r, i) => (
@@ -158,8 +160,12 @@ export function FunilEditor({ clinicaId, nicho, onSaved }: {
                 <button type="button" onClick={() => mover(r.chave, 1)} disabled={i === ordenadas.length - 1}
                   className="p-1 rounded-md text-text-secondary hover:text-text-primary disabled:opacity-30" aria-label="Descer"><ChevronDown size={14} /></button>
               </div>
-              <input value={r.rotulo} onChange={e => atualizar(r.chave, { rotulo: e.target.value })}
-                className={`${inputCls} flex-1`} />
+              <div className="flex-1 min-w-0">
+                <p className="text-[10px] leading-4 text-text-secondary">{rotuloOriginal(r.chave)}</p>
+                <input value={r.rotulo} onChange={e => atualizar(r.chave, { rotulo: e.target.value })}
+                  aria-label={`Nome da coluna ${rotuloOriginal(r.chave)}`}
+                  className={inputCls} />
+              </div>
               <div className="flex gap-3 text-xs text-text-secondary whitespace-nowrap">
                 <label className="flex items-center gap-1.5">
                   <input type="checkbox" checked={r.exige_consulta_realizada}
@@ -192,7 +198,10 @@ export function FunilEditor({ clinicaId, nicho, onSaved }: {
           <div className="space-y-2">
             {dobradas.map(r => (
               <div key={r.chave} className="flex flex-col sm:flex-row sm:items-center gap-2 border border-border rounded-xl p-3">
-                <span className="flex-1 text-sm text-text-secondary">{r.rotulo}</span>
+                <div className="flex-1 min-w-0">
+                  <p className="text-[10px] leading-4 text-text-secondary">{rotuloOriginal(r.chave)}</p>
+                  <p className="text-sm text-text-primary">{r.rotulo}</p>
+                </div>
                 <span className="text-[11px] text-text-secondary">
                   aparece em {rows.find(x => x.chave === r.mapeia_para)?.rotulo ?? r.mapeia_para}
                 </span>

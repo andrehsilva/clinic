@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { etapasPadrao, resolverFunil, type Etapa } from './funil'
+import { aplicarLayoutSimplificado, etapasPadrao, resolverFunil, type Etapa } from './funil'
 import { ETAPAS_AUTOMATICAS } from './statusRules'
 
 /** Aplica um patch a uma etapa do funil padrão e devolve a lista resolvida. */
@@ -64,5 +64,30 @@ describe('resolverFunil', () => {
     expect(f.pacienteKeys).toContain('follow_up_2_feito')
     expect(f.pacienteKeys).toContain('retornar_6_meses')
     expect(f.pacienteKeys).toContain('orcamento_pendente')
+  })
+})
+
+describe('aplicarLayoutSimplificado', () => {
+  it('shows Reagendar inside the renamed Em conversa column', () => {
+    const originais = etapasPadrao('odontologica')
+    const f = resolverFunil(aplicarLayoutSimplificado(originais))
+
+    expect(chaves(f.visiveis)).toHaveLength(8)
+    expect(chaves(f.visiveis)).toContain('conversando')
+    expect(chaves(f.visiveis)).not.toContain('paciente_recorrente')
+    expect(f.labels.conversando).toBe('Em conversa - Reagendamento')
+    expect(f.statusExibido.paciente_recorrente).toBe('conversando')
+  })
+
+  it('preserves technical keys and patient rules for automations', () => {
+    const originais = etapasPadrao('odontologica')
+    const simplificadas = aplicarLayoutSimplificado(originais)
+    const f = resolverFunil(simplificadas)
+
+    expect(simplificadas.map(e => e.chave)).toEqual(originais.map(e => e.chave))
+    expect(simplificadas.map(e => [e.chave, e.exige_consulta_realizada, e.e_paciente]))
+      .toEqual(originais.map(e => [e.chave, e.exige_consulta_realizada, e.e_paciente]))
+    expect(f.exigeConsulta.has('paciente_recorrente')).toBe(true)
+    expect(f.pacienteKeys).toContain('paciente_recorrente')
   })
 })

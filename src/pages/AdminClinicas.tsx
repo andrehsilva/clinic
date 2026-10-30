@@ -294,7 +294,7 @@ export default function AdminClinicas() {
           onClose={() => setFunilDe(null)}
           onSaved={() => {
             fetchAll()
-            // Se o admin editou a própria clínica, o funil em uso na sessão precisa recarregar.
+            // Os dados da clínica e o funil da sessão precisam refletir o salvamento.
             if (funilDe.id === minhaClinicaId) window.dispatchEvent(new Event('clinic-logo-updated'))
           }}
         />

@@ -135,6 +135,29 @@ export const MAPA_PADRAO: Record<string, string> = {
   retornar_1_ano: 'retornar_3_meses',
 }
 
+/** Dobras do layout enxuto; as chaves técnicas e regras permanecem inalteradas. */
+export const DOBRAS_LAYOUT_SIMPLIFICADO: Record<string, string> = {
+  follow_up_2_feito: 'follow_up_1_feito',
+  follow_up_3_feito: 'consulta_confirmada',
+  consulta_realizada: 'orcamento_pendente',
+  paciente_recorrente: 'conversando',
+  retornar_6_meses: 'retornar_3_meses',
+  retornar_1_ano: 'retornar_3_meses',
+}
+
+/** Preset visual; mantém as chaves e regras originais do funil. */
+export function aplicarLayoutSimplificado(etapas: Etapa[]): Etapa[] {
+  const chaves = new Set(etapas.map(e => e.chave))
+  return etapas.map(e => {
+    const destino = DOBRAS_LAYOUT_SIMPLIFICADO[e.chave]
+    return {
+      ...e,
+      rotulo: e.chave === 'conversando' ? 'Em conversa - Reagendamento' : e.rotulo,
+      mapeia_para: destino ? (chaves.has(destino) ? destino : null) : null,
+    }
+  })
+}
+
 /** Etapas do nicho, com a ordem padrão. Usado enquanto a clínica não tem linhas em funil_etapas. */
 export function etapasPadrao(nicho: Nicho = 'estetica'): Etapa[] {
   return CHAVES_FUNIL.map((chave, i) => ({
