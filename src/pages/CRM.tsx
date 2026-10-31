@@ -140,9 +140,7 @@ function LeadCard({
       {etapaReal && <span className="inline-block mt-1 mr-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-border-subtle text-text-secondary" title="Etapa real do lead, dobrada nesta coluna">↳ {etapaReal}</span>}
       {horasParadas !== null && !overlay && <span className="inline-block mt-1 mr-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-danger-light text-status-danger">Parado há {horasParadas}h</span>}
       {lead.data_virou_recorrente && <span className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-purple-light text-status-purple">Paciente ativo</span>}
-      {lead.tag_paciente_recorrente && <span className="inline-block mt-1 mr-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-purple-light text-status-purple">Paciente Recorrente</span>}
       {lead.em_tratamento && <span className="inline-block mt-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-purple-light text-status-purple">Em tratamento</span>}
-      {lead.atendimento_manual && <span className="inline-block mt-1 mr-1 text-[10px] font-semibold px-2 py-0.5 rounded-full bg-status-warning-light text-status-warning">Atendimento manual</span>}
       <CopyBadge value={lead.status} />
     </div>
   )
@@ -179,8 +177,8 @@ function KanbanColumn({ column, leads, isOver, onToggleManual, onToggleRecorrent
     <div className="flex flex-col flex-shrink-0 w-[232px]">
       <div className="flex items-center gap-2 mb-3 px-1">
         <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${statusColor.dot}`} />
-        <h3 className="text-xs font-semibold text-text-primary flex-1 truncate">{column.label}</h3>
-        <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded-full ${statusColor.badgeBg} ${statusColor.badgeText}`}>{leads.length}</span>
+        <h3 className="text-sm font-bold text-text-primary flex-1 truncate leading-tight">{column.label}</h3>
+        <span className={`text-[11px] font-bold px-2 py-0.5 rounded-full ${statusColor.badgeBg} ${statusColor.badgeText}`}>{leads.length}</span>
       </div>
       <div ref={setNodeRef} data-kanban-column className={`flex flex-col gap-2.5 flex-1 min-h-[120px] p-2 rounded-[14px] transition-colors duration-150 overflow-y-auto ${isOver ? 'bg-accent-light ring-2 ring-accent/30' : 'bg-border-subtle'}`}>
         {leads.length === 0 ? (
