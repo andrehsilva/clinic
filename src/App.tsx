@@ -7,6 +7,7 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './contexts/ThemeContext'
 import Login from './pages/Login'
 import RedefinirSenha from './pages/RedefinirSenha'
+import { ConsultaVencidaGate } from './components/ConsultaVencidaGate'
 
 const Dashboard = lazy(() => import('./pages/Dashboard'))
 const CRM = lazy(() => import('./pages/CRM'))
@@ -29,7 +30,7 @@ function AppLayout() {
   return (
     <div className="flex h-screen overflow-hidden bg-page">
       <Sidebar collapsed={collapsed} setCollapsed={setCollapsed} />
-      <main className="flex-1 overflow-hidden">
+      <main className="relative flex-1 overflow-hidden">
         <Suspense fallback={<RouteFallback />}>
           <Routes>
             <Route path="/" element={<Dashboard />} />
@@ -41,6 +42,7 @@ function AppLayout() {
             <Route path="*" element={<Navigate to="/" replace />} />
           </Routes>
         </Suspense>
+        <ConsultaVencidaGate />
       </main>
     </div>
   )
